@@ -1,0 +1,67 @@
+apiVersion: rollup.oplabs.io/v1alpha1
+kind: OPChain
+metadata:
+  name: test-chain
+  namespace: default
+spec:
+  # Chain Configuration
+  chainId: 777
+  networkName: "test-network"
+  
+  # L1 Configuration (pointing to local Anvil)
+  # Note: In Kind, host.docker.internal resolves to host machine
+  l1:
+    rpcUrl: "http://host.docker.internal:8545"
+    chainId: 11155111
+    deployerPrivateKeySecret: "deployer-key"
+    
+  # Component Configuration
+  components:
+    geth:
+      enabled: true
+      image: "ethereum/client-go:v1.13.15"  # Use standard geth for testing
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
+      storage:
+        size: "10Gi"
+        # storageClass: "standard"  # Uncomment if you have a specific storage class
+    
+    node:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.9.4"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+    
+    batcher:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:v1.9.4"
+      signerPrivateKeySecret: "batcher-key"
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "128Mi"
+        limits:
+          cpu: "200m"
+          memory: "256Mi"
+    
+    proposer:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-proposer:v1.9.4"
+      signerPrivateKeySecret: "proposer-key"
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "128Mi"
+        limits:
+          cpu: "200m"
+          memory: "256Mi" 

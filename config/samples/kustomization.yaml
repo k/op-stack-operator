@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- rollup_v1alpha1_opchain.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

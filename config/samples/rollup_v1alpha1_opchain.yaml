@@ -1,0 +1,72 @@
+apiVersion: rollup.oplabs.io/v1alpha1
+kind: OPChain
+metadata:
+  labels:
+    app.kubernetes.io/name: opchain
+    app.kubernetes.io/instance: opchain-sample
+    app.kubernetes.io/part-of: opstack-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: opstack-operator
+  name: opchain-sample
+  namespace: opstack-system
+spec:
+  # Chain configuration
+  chainId: 777
+  networkName: "sample-network"
+  
+  # L1 configuration
+  l1:
+    rpcUrl: "https://sepolia.infura.io/v3/YOUR_API_KEY"
+    chainId: 11155111  # Sepolia testnet
+    deployerPrivateKeySecret: "deployer-key"
+    
+  # Component configuration
+  components:
+    geth:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-geth:v1.101408.0"
+      resources:
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+      storage:
+        size: "100Gi"
+        storageClass: "standard"
+    
+    node:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.9.4"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+    
+    batcher:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:v1.9.4"
+      signerPrivateKeySecret: "batcher-key"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+    
+    proposer:
+      enabled: true
+      image: "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-proposer:v1.9.4"
+      signerPrivateKeySecret: "proposer-key"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
