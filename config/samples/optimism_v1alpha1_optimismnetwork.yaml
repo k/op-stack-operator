@@ -4,6 +4,62 @@ metadata:
   labels:
     app.kubernetes.io/name: op-stack-operator
     app.kubernetes.io/managed-by: kustomize
-  name: optimismnetwork-sample
+  name: op-sepolia
+  namespace: optimism-system
 spec:
-  # TODO(user): Add fields here
+  # Network Configuration
+  networkName: "op-sepolia"
+  chainID: 11155420
+  l1ChainID: 11155111
+
+  # RPC Endpoints
+  l1RpcUrl: "https://sepolia.infura.io/v3/YOUR-API-KEY"
+  l1BeaconUrl: "https://sepolia-beacon.example.com"
+  l2RpcUrl: "http://op-sepolia-node:8545"
+
+  # L1 RPC Configuration
+  l1RpcKind: "infura"
+  l1RpcRateLimit: 10
+  l1RpcTimeout: "10s"
+
+  # Network-specific Configuration Files
+  rollupConfig:
+    autoDiscover: true
+  l2Genesis:
+    autoDiscover: true
+
+  # Contract Address Discovery (will use well-known addresses for op-sepolia)
+  contractAddresses:
+    discoveryMethod: "well-known"
+    cacheTimeout: "24h"
+
+  # Shared Configuration
+  sharedConfig:
+    # Logging
+    logging:
+      level: "info"
+      format: "logfmt"
+      color: false
+
+    # Metrics
+    metrics:
+      enabled: true
+      port: 7300
+      path: "/metrics"
+
+    # Resource Defaults
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
+
+    # Security
+    security:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: "RuntimeDefault"

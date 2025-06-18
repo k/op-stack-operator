@@ -14,10 +14,26 @@ spec:
     singular: optimismnetwork
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.networkName
+      name: Network
+      type: string
+    - jsonPath: .spec.chainID
+      name: ChainID
+      type: integer
+    - jsonPath: .spec.l1ChainID
+      name: L1ChainID
+      type: integer
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: OptimismNetwork is the Schema for the optimismnetworks API.
+        description: OptimismNetwork is the Schema for the optimismnetworks API
         properties:
           apiVersion:
             description: |-
@@ -37,15 +53,319 @@ spec:
           metadata:
             type: object
           spec:
-            description: OptimismNetworkSpec defines the desired state of OptimismNetwork.
+            description: OptimismNetworkSpec defines the desired state of OptimismNetwork
             properties:
-              foo:
-                description: Foo is an example field of OptimismNetwork. Edit optimismnetwork_types.go
-                  to remove/update
+              chainID:
+                format: int64
+                type: integer
+              contractAddresses:
+                description: Contract Address Discovery
+                properties:
+                  cacheTimeout:
+                    description: |-
+                      A Duration represents the elapsed time between two instants
+                      as an int64 nanosecond count. The representation limits the
+                      largest representable duration to approximately 290 years.
+                    format: int64
+                    type: integer
+                  discoveryMethod:
+                    description: Discovery configuration
+                    type: string
+                  disputeGameFactoryAddr:
+                    type: string
+                  l2OutputOracleAddr:
+                    type: string
+                  optimismPortalAddr:
+                    type: string
+                  systemConfigAddr:
+                    description: L1 Contract Addresses (optional - helps with discovery)
+                    type: string
+                type: object
+              l1BeaconUrl:
                 type: string
+              l1ChainID:
+                format: int64
+                type: integer
+              l1RpcKind:
+                description: L1 RPC Configuration
+                type: string
+              l1RpcRateLimit:
+                type: integer
+              l1RpcTimeout:
+                description: |-
+                  A Duration represents the elapsed time between two instants
+                  as an int64 nanosecond count. The representation limits the
+                  largest representable duration to approximately 290 years.
+                format: int64
+                type: integer
+              l1RpcUrl:
+                description: RPC Endpoints
+                type: string
+              l2Genesis:
+                description: ConfigSource defines how configuration data is provided
+                properties:
+                  autoDiscover:
+                    type: boolean
+                  configMapRef:
+                    description: Selects a key from a ConfigMap.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the ConfigMap or its key must
+                          be defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  inline:
+                    type: string
+                type: object
+              l2RpcUrl:
+                type: string
+              networkName:
+                description: Network Configuration
+                type: string
+              rollupConfig:
+                description: Network-specific Configuration Files
+                properties:
+                  autoDiscover:
+                    type: boolean
+                  configMapRef:
+                    description: Selects a key from a ConfigMap.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the ConfigMap or its key must
+                          be defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  inline:
+                    type: string
+                type: object
+              sharedConfig:
+                description: Shared Configuration
+                properties:
+                  logging:
+                    description: Logging
+                    properties:
+                      color:
+                        type: boolean
+                      format:
+                        type: string
+                      level:
+                        type: string
+                    type: object
+                  metrics:
+                    description: Metrics
+                    properties:
+                      enabled:
+                        type: boolean
+                      path:
+                        type: string
+                      port:
+                        format: int32
+                        type: integer
+                    type: object
+                  resources:
+                    description: Resource Defaults
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: ResourceList is a set of (resource name, quantity)
+                          pairs.
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: ResourceList is a set of (resource name, quantity)
+                          pairs.
+                        type: object
+                    type: object
+                  security:
+                    description: Security
+                    properties:
+                      fsGroup:
+                        format: int64
+                        type: integer
+                      runAsNonRoot:
+                        type: boolean
+                      runAsUser:
+                        format: int64
+                        type: integer
+                      seccompProfile:
+                        description: |-
+                          SeccompProfile defines a pod/container's seccomp profile settings.
+                          Only one profile source may be set.
+                        properties:
+                          localhostProfile:
+                            description: |-
+                              localhostProfile indicates a profile defined in a file on the node should be used.
+                              The profile must be preconfigured on the node to work.
+                              Must be a descending path, relative to the kubelet's configured seccomp profile location.
+                              Must be set if type is "Localhost". Must NOT be set for any other type.
+                            type: string
+                          type:
+                            description: |-
+                              type indicates which kind of seccomp profile will be applied.
+                              Valid options are:
+
+                              Localhost - a profile defined in a file on the node should be used.
+                              RuntimeDefault - the container runtime default profile should be used.
+                              Unconfined - no profile should be applied.
+                            type: string
+                        required:
+                        - type
+                        type: object
+                    type: object
+                type: object
+            required:
+            - chainID
+            - l1ChainID
+            - l1RpcUrl
             type: object
           status:
-            description: OptimismNetworkStatus defines the observed state of OptimismNetwork.
+            description: OptimismNetworkStatus defines the observed state of OptimismNetwork
+            properties:
+              conditions:
+                description: Conditions represent detailed status conditions
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              networkInfo:
+                description: NetworkInfo contains discovered network information
+                properties:
+                  deploymentTimestamp:
+                    format: date-time
+                    type: string
+                  discoveredContracts:
+                    description: Discovered contract addresses (populated by controller)
+                    properties:
+                      discoveryMethod:
+                        type: string
+                      disputeGameFactoryAddr:
+                        type: string
+                      l1CrossDomainMessengerAddr:
+                        type: string
+                      l1StandardBridgeAddr:
+                        type: string
+                      l2CrossDomainMessengerAddr:
+                        description: L2 Contracts (predeploys)
+                        type: string
+                      l2OutputOracleAddr:
+                        description: L1 Contracts
+                        type: string
+                      l2StandardBridgeAddr:
+                        type: string
+                      l2ToL1MessagePasserAddr:
+                        type: string
+                      lastDiscoveryTime:
+                        description: Discovery metadata
+                        format: date-time
+                        type: string
+                      optimismPortalAddr:
+                        type: string
+                      systemConfigAddr:
+                        type: string
+                    type: object
+                  lastUpdated:
+                    format: date-time
+                    type: string
+                type: object
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed spec
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the overall state of the network configuration
+                type: string
             type: object
         type: object
     served: true

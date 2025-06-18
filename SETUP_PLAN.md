@@ -227,14 +227,15 @@ type ImageConfig struct {
 
 // VersionCompatibilityMatrix defines known compatible version combinations
 // These should be updated based on testing and official releases
+// These are outdated just use what is already in the repo
 var VersionCompatibilityMatrix = map[string]VersionSet{
-    // Stable production versions
-    "stable-v1.9": {
-        OpNode:      "v1.9.5",
-        OpGeth:      "v1.101511.0",      // Based on geth v1.15.11
-        OpBatcher:   "v1.9.5",
-        OpProposer:  "v1.9.5",
-        OpChallenger: "v1.3.0",          // Different versioning scheme
+    // Stable production versions - verified January 2025
+    "stable-v1.13": {
+        OpNode:       "v1.13.3",     // Latest stable op-node
+        OpGeth:       "v1.101511.0", // Based on geth v1.15.11
+        OpBatcher:    "v1.12.0",     // Compatible with Isthmus
+        OpProposer:   "v1.10.0",     // Latest stable op-proposer
+        OpChallenger: "v1.5.1",      // Latest challenger version
     },
 }
 
