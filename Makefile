@@ -61,7 +61,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: test-unit test-integration ## Run all tests (unit + integration)
+test: test-unit test-integration-with-env ## Run all tests (unit + integration)
 
 .PHONY: test-unit
 test-unit: manifests generate fmt vet setup-envtest ## Run unit tests (controller logic only)

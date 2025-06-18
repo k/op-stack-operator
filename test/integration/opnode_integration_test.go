@@ -337,7 +337,7 @@ var _ = Describe("OpNode Integration", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			Expect(jwtSecret.Data).Should(HaveKey("jwt"))
-			Expect(len(jwtSecret.Data["jwt"])).Should(BeNumerically(">", 0))
+			Expect(jwtSecret.Data["jwt"]).ShouldNot(BeEmpty())
 
 			By("Checking that P2P secret is created")
 			p2pSecretKey := types.NamespacedName{Name: OpNodeName + "-p2p", Namespace: OpNodeNamespace}
@@ -348,7 +348,7 @@ var _ = Describe("OpNode Integration", func() {
 			}, timeout, interval).Should(BeTrue())
 
 			Expect(p2pSecret.Data).Should(HaveKey("private-key"))
-			Expect(len(p2pSecret.Data["private-key"])).Should(BeNumerically(">", 0))
+			Expect(p2pSecret.Data["private-key"]).ShouldNot(BeEmpty())
 
 			By("Checking that StatefulSet is created")
 			statefulSetKey := types.NamespacedName{Name: OpNodeName, Namespace: OpNodeNamespace}
@@ -372,7 +372,7 @@ var _ = Describe("OpNode Integration", func() {
 
 			Expect(service.Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
 			Expect(service.Annotations).Should(HaveKeyWithValue("test.annotation", "test-value"))
-			Expect(len(service.Spec.Ports)).Should(BeNumerically(">", 0))
+			Expect(service.Spec.Ports).ShouldNot(BeEmpty())
 
 			By("Checking OpNode status conditions")
 			Eventually(func() bool {

@@ -105,7 +105,9 @@ func buildDefaultServicePorts(opNode *optimismv1alpha1.OpNode) []corev1.ServiceP
 	var ports []corev1.ServicePort
 
 	// op-geth HTTP RPC port
-	if opNode.Spec.OpGeth.Networking != nil && opNode.Spec.OpGeth.Networking.HTTP != nil && opNode.Spec.OpGeth.Networking.HTTP.Enabled {
+	if opNode.Spec.OpGeth.Networking != nil &&
+		opNode.Spec.OpGeth.Networking.HTTP != nil &&
+		opNode.Spec.OpGeth.Networking.HTTP.Enabled {
 		port := getDefaultInt32(opNode.Spec.OpGeth.Networking.HTTP.Port, 8545)
 		ports = append(ports, corev1.ServicePort{
 			Name:       "geth-http",
@@ -116,7 +118,9 @@ func buildDefaultServicePorts(opNode *optimismv1alpha1.OpNode) []corev1.ServiceP
 	}
 
 	// op-geth WebSocket port
-	if opNode.Spec.OpGeth.Networking != nil && opNode.Spec.OpGeth.Networking.WS != nil && opNode.Spec.OpGeth.Networking.WS.Enabled {
+	if opNode.Spec.OpGeth.Networking != nil &&
+		opNode.Spec.OpGeth.Networking.WS != nil &&
+		opNode.Spec.OpGeth.Networking.WS.Enabled {
 		port := getDefaultInt32(opNode.Spec.OpGeth.Networking.WS.Port, 8546)
 		ports = append(ports, corev1.ServicePort{
 			Name:       "geth-ws",

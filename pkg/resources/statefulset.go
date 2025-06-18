@@ -30,7 +30,10 @@ import (
 )
 
 // CreateOpNodeStatefulSet creates a StatefulSet for OpNode (op-geth + op-node)
-func CreateOpNodeStatefulSet(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) *appsv1.StatefulSet {
+func CreateOpNodeStatefulSet(
+	opNode *optimismv1alpha1.OpNode,
+	network *optimismv1alpha1.OptimismNetwork,
+) *appsv1.StatefulSet {
 	labels := map[string]string{
 		"app.kubernetes.io/name":       "opnode",
 		"app.kubernetes.io/instance":   opNode.Name,
@@ -108,7 +111,10 @@ func CreateOpNodeStatefulSet(opNode *optimismv1alpha1.OpNode, network *optimismv
 }
 
 // createOpGethContainer creates the op-geth container
-func createOpGethContainer(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) corev1.Container {
+func createOpGethContainer(
+	opNode *optimismv1alpha1.OpNode,
+	network *optimismv1alpha1.OptimismNetwork,
+) corev1.Container {
 	// Default resource requirements for op-geth
 	resources := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -155,30 +161,34 @@ func createOpGethContainer(opNode *optimismv1alpha1.OpNode, network *optimismv1a
 	args = append(args, "--syncmode="+syncMode)
 
 	// Add HTTP RPC configuration
-	if opNode.Spec.OpGeth.Networking != nil && opNode.Spec.OpGeth.Networking.HTTP != nil && opNode.Spec.OpGeth.Networking.HTTP.Enabled {
+	if opNode.Spec.OpGeth.Networking != nil &&
+		opNode.Spec.OpGeth.Networking.HTTP != nil &&
+		opNode.Spec.OpGeth.Networking.HTTP.Enabled {
 		httpConfig := opNode.Spec.OpGeth.Networking.HTTP
 		args = append(args, "--http")
 		args = append(args, "--http.addr="+getDefaultString(httpConfig.Host, "0.0.0.0"))
 		args = append(args, "--http.port="+fmt.Sprintf("%d", getDefaultInt32(httpConfig.Port, 8545)))
 		if len(httpConfig.APIs) > 0 {
-			args = append(args, "--http.api="+joinStrings(httpConfig.APIs, ","))
+			args = append(args, "--http.api="+joinStrings(httpConfig.APIs))
 		}
 		if httpConfig.CORS != nil && len(httpConfig.CORS.Origins) > 0 {
-			args = append(args, "--http.corsdomain="+joinStrings(httpConfig.CORS.Origins, ","))
+			args = append(args, "--http.corsdomain="+joinStrings(httpConfig.CORS.Origins))
 		}
 	}
 
 	// Add WebSocket configuration
-	if opNode.Spec.OpGeth.Networking != nil && opNode.Spec.OpGeth.Networking.WS != nil && opNode.Spec.OpGeth.Networking.WS.Enabled {
+	if opNode.Spec.OpGeth.Networking != nil &&
+		opNode.Spec.OpGeth.Networking.WS != nil &&
+		opNode.Spec.OpGeth.Networking.WS.Enabled {
 		wsConfig := opNode.Spec.OpGeth.Networking.WS
 		args = append(args, "--ws")
 		args = append(args, "--ws.addr="+getDefaultString(wsConfig.Host, "0.0.0.0"))
 		args = append(args, "--ws.port="+fmt.Sprintf("%d", getDefaultInt32(wsConfig.Port, 8546)))
 		if len(wsConfig.APIs) > 0 {
-			args = append(args, "--ws.api="+joinStrings(wsConfig.APIs, ","))
+			args = append(args, "--ws.api="+joinStrings(wsConfig.APIs))
 		}
 		if len(wsConfig.Origins) > 0 {
-			args = append(args, "--ws.origins="+joinStrings(wsConfig.Origins, ","))
+			args = append(args, "--ws.origins="+joinStrings(wsConfig.Origins))
 		}
 	}
 
@@ -234,7 +244,10 @@ func createOpGethContainer(opNode *optimismv1alpha1.OpNode, network *optimismv1a
 }
 
 // createOpNodeContainer creates the op-node container
-func createOpNodeContainer(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) corev1.Container {
+func createOpNodeContainer(
+	opNode *optimismv1alpha1.OpNode,
+	network *optimismv1alpha1.OptimismNetwork,
+) corev1.Container {
 	// Default resource requirements for op-node
 	resources := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -311,7 +324,9 @@ func createOpNodeContainer(opNode *optimismv1alpha1.OpNode, network *optimismv1a
 	}
 
 	// Add metrics configuration
-	if network.Spec.SharedConfig != nil && network.Spec.SharedConfig.Metrics != nil && network.Spec.SharedConfig.Metrics.Enabled {
+	if network.Spec.SharedConfig != nil &&
+		network.Spec.SharedConfig.Metrics != nil &&
+		network.Spec.SharedConfig.Metrics.Enabled {
 		metrics := network.Spec.SharedConfig.Metrics
 		args = append(args, "--metrics.enabled")
 		args = append(args, "--metrics.addr=0.0.0.0")
@@ -324,7 +339,9 @@ func createOpNodeContainer(opNode *optimismv1alpha1.OpNode, network *optimismv1a
 	}
 
 	// Add P2P key mount if specified
-	if opNode.Spec.OpNode.P2P != nil && opNode.Spec.OpNode.P2P.PrivateKey != nil && opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
+	if opNode.Spec.OpNode.P2P != nil &&
+		opNode.Spec.OpNode.P2P.PrivateKey != nil &&
+		opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name: "p2p-key", MountPath: "/secrets/p2p", ReadOnly: true,
 		})
@@ -392,7 +409,9 @@ func createVolumes(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.Op
 	}
 
 	// Add P2P key volume if specified
-	if opNode.Spec.OpNode.P2P != nil && opNode.Spec.OpNode.P2P.PrivateKey != nil && opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
+	if opNode.Spec.OpNode.P2P != nil &&
+		opNode.Spec.OpNode.P2P.PrivateKey != nil &&
+		opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
 		volumes = append(volumes, corev1.Volume{
 			Name: "p2p-key",
 			VolumeSource: corev1.VolumeSource{
@@ -464,18 +483,18 @@ func getDefaultInt32(value, defaultValue int32) int32 {
 	return value
 }
 
-func joinStrings(strs []string, sep string) string {
+func joinStrings(strs []string) string {
 	if len(strs) == 0 {
 		return ""
 	}
 	result := strs[0]
 	for i := 1; i < len(strs); i++ {
-		result += sep + strs[i]
+		result += "," + strs[i]
 	}
 	return result
 }
 
-func getSequencerEndpoint(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) string {
+func getSequencerEndpoint(_ *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) string {
 	// For now, use the L1 RPC URL as a placeholder
 	// In a full implementation, this would resolve to the actual sequencer endpoint
 	return network.Spec.L1RpcUrl

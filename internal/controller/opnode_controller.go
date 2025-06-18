@@ -132,12 +132,10 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		needsStatusUpdate = true
 	} else {
 		utils.SetCondition(&opNode.Status.Conditions, "NetworkReady", metav1.ConditionTrue, "NetworkReady", "OptimismNetwork is ready")
-		needsStatusUpdate = true
 
 		// Update phase to initializing
 		if opNode.Status.Phase != OpNodePhaseRunning {
 			opNode.Status.Phase = OpNodePhaseInitializing
-			needsStatusUpdate = true
 		}
 
 		// Reconcile secrets (JWT, P2P keys)
@@ -147,7 +145,6 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			needsStatusUpdate = true
 		} else {
 			utils.SetCondition(&opNode.Status.Conditions, "SecretsReady", metav1.ConditionTrue, "SecretsReconciled", "All required secrets are ready")
-			needsStatusUpdate = true
 
 			// Reconcile StatefulSet
 			if err := r.reconcileStatefulSet(ctx, &opNode, network); err != nil {
@@ -156,7 +153,6 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				needsStatusUpdate = true
 			} else {
 				utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionTrue, "StatefulSetReconciled", "StatefulSet is ready")
-				needsStatusUpdate = true
 
 				// Reconcile Service
 				if err := r.reconcileService(ctx, &opNode, network); err != nil {
@@ -167,9 +163,7 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 					utils.SetCondition(&opNode.Status.Conditions, "ServiceReady", metav1.ConditionTrue, "ServiceReconciled", "Service is ready")
 
 					// Update node status (don't fail reconciliation for status update errors)
-					if err := r.updateNodeStatus(ctx, &opNode); err != nil {
-						logger.Error(err, "failed to update node status")
-					}
+					r.updateNodeStatus(ctx, &opNode)
 
 					// Update final status
 					opNode.Status.Phase = OpNodePhaseRunning
@@ -434,7 +428,7 @@ func (r *OpNodeReconciler) reconcileService(ctx context.Context, opNode *optimis
 }
 
 // updateNodeStatus updates the node operational status
-func (r *OpNodeReconciler) updateNodeStatus(ctx context.Context, opNode *optimismv1alpha1.OpNode) error {
+func (r *OpNodeReconciler) updateNodeStatus(_ context.Context, opNode *optimismv1alpha1.OpNode) {
 	// For now, we'll set basic status information
 	// In a full implementation, this would query the actual node for status
 
@@ -451,8 +445,6 @@ func (r *OpNodeReconciler) updateNodeStatus(ctx context.Context, opNode *optimis
 		opNode.Status.NodeInfo.SyncStatus = &optimismv1alpha1.SyncStatusInfo{}
 	}
 	opNode.Status.NodeInfo.SyncStatus.Syncing = false // Would be queried from actual node
-
-	return nil
 }
 
 // handleDeletion handles the deletion of OpNode resources
