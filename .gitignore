@@ -25,3 +25,17 @@ go.work
 *.swp
 *.swo
 *~
+
+# Environment and configuration files
+.env
+.env.local
+.env.*.local
+test/config/env.local
+config/secrets/
+*.key
+*.pem
+
+# Test artifacts and temporary files
+test/tmp/
+test/coverage.out
+test-results.xml

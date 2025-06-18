@@ -50,7 +50,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: generate-all
-generate-all: manifests generate fmt vet ## Generate all code and manifests
+generate-all: manifests generate fmt vet ## Generate all code and manifests (alias for common pre-test steps)
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -61,8 +61,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet setup-envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+test: test-unit test-integration ## Run all tests (unit + integration)
 
 .PHONY: test-unit
 test-unit: manifests generate fmt vet setup-envtest ## Run unit tests (controller logic only)
@@ -70,7 +69,16 @@ test-unit: manifests generate fmt vet setup-envtest ## Run unit tests (controlle
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet setup-envtest ## Run integration tests (with envtest)
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./test/integration/... -v
+	@if [ -n "$$TEST_L1_RPC_URL" ]; then \
+		echo "Running integration tests with provided L1 RPC URL..."; \
+		KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./test/integration/... -v; \
+	else \
+		echo "⏭️ Skipping integration tests - no TEST_L1_RPC_URL environment variable set"; \
+		echo "To run integration tests:"; \
+		echo "  1. Set up environment: make setup-test-env"; \
+		echo "  2. Load environment: export \$$(cat test/config/env.local | xargs)"; \
+		echo "  3. Or use: make test-integration-with-env"; \
+	fi
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
@@ -147,6 +155,21 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 
 ##@ Development Tools
 
+.PHONY: setup-test-env
+setup-test-env: ## Set up secure test environment with API keys
+	@./scripts/setup-test-env.sh
+
+.PHONY: test-integration-with-env
+test-integration-with-env: manifests generate fmt vet setup-envtest ## Run integration tests with environment file
+	@if [ -f "test/config/env.local" ]; then \
+		echo "Loading environment from test/config/env.local..."; \
+		export $$(grep -v '^#' test/config/env.local | grep -v '^$$' | sed 's/#.*//' | xargs) && \
+		KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./test/integration/... -v; \
+	else \
+		echo "❌ test/config/env.local not found. Run 'make setup-test-env' first."; \
+		exit 1; \
+	fi
+
 .PHONY: kind-load
 kind-load: docker-build ## Load image into kind cluster for testing
 	kind load docker-image ${IMG}
@@ -158,12 +181,14 @@ deploy-samples: ## Deploy sample configurations
 ##@ Examples
 
 .PHONY: examples-basic
-examples-basic: ## Deploy basic example
-	kubectl apply -f examples/basic/
+examples-basic: ## Deploy basic example (TODO: implement examples/basic/)
+	@echo "❌ Basic examples not yet implemented"
+	@echo "TODO: Create examples/basic/ directory with sample configurations"
 
 .PHONY: examples-production
-examples-production: ## Deploy production example
-	kubectl apply -f examples/production/
+examples-production: ## Deploy production example (TODO: implement examples/production/)
+	@echo "❌ Production examples not yet implemented"
+	@echo "TODO: Create examples/production/ directory with sample configurations"
 
 ##@ Deployment
 

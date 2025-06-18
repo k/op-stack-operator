@@ -18,6 +18,8 @@ package integration
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,23 +35,36 @@ import (
 var _ = Describe("OptimismNetwork Integration", func() {
 	Context("When reconciling an OptimismNetwork", func() {
 		const (
-			OptimismNetworkName      = "test-network"
 			OptimismNetworkNamespace = "default"
 			timeout                  = time.Second * 10
 			duration                 = time.Second * 10
 			interval                 = time.Millisecond * 250
-			// Real Alchemy Sepolia URL for testing
-			testL1RpcUrl = "https://eth-sepolia.g.alchemy.com/v2/zeFYT4eQdrTCht4MM6BhQFqWzZ81QO8O"
 		)
 
-		ctx := context.Background()
+		var OptimismNetworkName string
 
-		typeNamespace := types.NamespacedName{
-			Name:      OptimismNetworkName,
-			Namespace: OptimismNetworkNamespace,
-		}
+		var testL1RpcUrl string
+
+		var (
+			ctx           = context.Background()
+			typeNamespace = types.NamespacedName{
+				Name:      OptimismNetworkName,
+				Namespace: OptimismNetworkNamespace,
+			}
+		)
 
 		BeforeEach(func() {
+			// Generate unique name for each test to avoid conflicts
+			OptimismNetworkName = fmt.Sprintf("test-network-%d", time.Now().UnixNano())
+
+			// Get L1 RPC URL from environment variable, fallback to localhost for CI
+			testL1RpcUrl = os.Getenv("TEST_L1_RPC_URL")
+			if testL1RpcUrl == "" {
+				// Fallback for CI/testing without real RPC
+				testL1RpcUrl = "http://localhost:8545"
+				Skip("Skipping integration tests - no TEST_L1_RPC_URL environment variable set")
+			}
+
 			// Clean up any existing resources
 			network := &optimismv1alpha1.OptimismNetwork{}
 			if err := k8sClient.Get(ctx, typeNamespace, network); err == nil {
@@ -69,12 +84,18 @@ var _ = Describe("OptimismNetwork Integration", func() {
 		})
 
 		AfterEach(func() {
-			// Clean up resources
+			// Clean up resources with retry logic to handle resource version conflicts
 			network := &optimismv1alpha1.OptimismNetwork{}
 			if err := k8sClient.Get(ctx, typeNamespace, network); err == nil {
-				// Remove finalizers to allow immediate deletion
-				network.Finalizers = []string{}
-				Expect(k8sClient.Update(ctx, network)).To(Succeed())
+				// Remove finalizers to allow immediate deletion with retry
+				Eventually(func() bool {
+					// Get fresh copy to avoid version conflicts
+					if err := k8sClient.Get(ctx, typeNamespace, network); err != nil {
+						return true // Already deleted
+					}
+					network.Finalizers = []string{}
+					return k8sClient.Update(ctx, network) == nil
+				}, time.Second*3, time.Millisecond*100).Should(BeTrue())
 
 				// Delete the resource
 				Expect(k8sClient.Delete(ctx, network)).To(Succeed())

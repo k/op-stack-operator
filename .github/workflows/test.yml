@@ -2,22 +2,94 @@ name: Tests
 
 on:
   push:
+    branches: [main, next]
   pull_request:
+    branches: [main, next]
+
+env:
+  GO_VERSION: "1.23"
 
 jobs:
-  test:
-    name: Run on Ubuntu
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Clone the code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          go-version-file: go.mod
+          go-version: ${{ env.GO_VERSION }}
 
-      - name: Running Tests
+      - name: Run unit tests
+        run: make test-unit
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run integration tests with secrets
+        env:
+          # These should be set as repository secrets in GitHub
+          TEST_L1_RPC_URL: ${{ secrets.TEST_L1_RPC_URL }}
+          TEST_L1_BEACON_URL: ${{ secrets.TEST_L1_BEACON_URL }}
+          CI_SKIP_INTEGRATION_TESTS: ${{ secrets.TEST_L1_RPC_URL == '' && 'true' || 'false' }}
         run: |
-          go mod tidy
-          make test
+          if [ "$CI_SKIP_INTEGRATION_TESTS" = "true" ]; then
+            echo "⏭️ Skipping integration tests - no API keys configured"
+            echo "To enable integration tests, set TEST_L1_RPC_URL secret in repository settings"
+            exit 0
+          fi
+          make test-integration
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1
+
+      - name: Run e2e tests
+        env:
+          TEST_L1_RPC_URL: ${{ secrets.TEST_L1_RPC_URL }}
+        run: |
+          if [ -n "$TEST_L1_RPC_URL" ]; then
+            make test-e2e
+          else
+            echo "⏭️ Skipping e2e tests - no API keys configured"
+          fi
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Gosec Security Scanner
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: ./...
+
+      - name: Check for secrets
+        run: |
+          # Check for accidentally committed secrets
+          if grep -r "alchemy.com/v2/" --include="*.go" --include="*.yaml" --include="*.yml" .; then
+            echo "❌ Found hardcoded API keys in code!"
+            exit 1
+          fi
+          echo "✅ No hardcoded API keys found"
