@@ -299,7 +299,9 @@ func createOpNodeContainer(
 			}
 		}
 
-		if p2pConfig.PrivateKey != nil && p2pConfig.PrivateKey.SecretRef != nil {
+		// Add P2P private key path if either auto-generated or user-provided
+		if p2pConfig.PrivateKey != nil &&
+			(p2pConfig.PrivateKey.Generate || p2pConfig.PrivateKey.SecretRef != nil) {
 			args = append(args, "--p2p.priv.path=/secrets/p2p/private-key")
 		}
 	}
@@ -338,10 +340,10 @@ func createOpNodeContainer(
 		{Name: "rollup-config", MountPath: "/config", ReadOnly: true},
 	}
 
-	// Add P2P key mount if specified
+	// Add P2P key mount if either auto-generated or user-provided
 	if opNode.Spec.OpNode.P2P != nil &&
 		opNode.Spec.OpNode.P2P.PrivateKey != nil &&
-		opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
+		(opNode.Spec.OpNode.P2P.PrivateKey.Generate || opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil) {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name: "p2p-key", MountPath: "/secrets/p2p", ReadOnly: true,
 		})
@@ -408,15 +410,26 @@ func createVolumes(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.Op
 		},
 	}
 
-	// Add P2P key volume if specified
+	// Add P2P key volume if either auto-generated or user-provided
 	if opNode.Spec.OpNode.P2P != nil &&
 		opNode.Spec.OpNode.P2P.PrivateKey != nil &&
-		opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
+		(opNode.Spec.OpNode.P2P.PrivateKey.Generate || opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil) {
+
+		// Determine the secret name based on how the key is managed
+		var secretName string
+		if opNode.Spec.OpNode.P2P.PrivateKey.Generate {
+			// Use the auto-generated secret name pattern
+			secretName = opNode.Name + "-p2p"
+		} else if opNode.Spec.OpNode.P2P.PrivateKey.SecretRef != nil {
+			// Use the user-provided secret name
+			secretName = opNode.Spec.OpNode.P2P.PrivateKey.SecretRef.Name
+		}
+
 		volumes = append(volumes, corev1.Volume{
 			Name: "p2p-key",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: opNode.Spec.OpNode.P2P.PrivateKey.SecretRef.Name,
+					SecretName: secretName,
 				},
 			},
 		})
