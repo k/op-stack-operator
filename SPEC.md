@@ -10,9 +10,12 @@ This document specifies a Kubernetes operator for managing OP Stack components, 
 
 1. **Separation of Concerns**: Each OP Stack component has its own CRD and controller
 2. **Configuration Inheritance**: Shared configurations are managed centrally via `OptimismNetwork`
-3. **Operational Flexibility**: Support both public node operators and chain operators
-4. **Security First**: Proper secret management and network isolation
-5. **Kubernetes Native**: Leverage native Kubernetes patterns and best practices
+3. **Service Discovery**: L2 connectivity handled through Kubernetes service discovery, not centralized configuration
+4. **Operational Flexibility**: Support both public node operators and chain operators
+5. **Security First**: Proper secret management and network isolation
+6. **Kubernetes Native**: Leverage native Kubernetes patterns and best practices
+
+> **Note**: OptimismNetwork focuses on L1 connectivity and shared configuration. L2 sequencer connectivity is handled by individual components through `sequencerRef` fields and Kubernetes service discovery.
 
 ### Component Relationships
 
@@ -44,14 +47,9 @@ spec:
   chainID: 10 # L2 Chain ID
   l1ChainID: 1 # L1 Chain ID (Ethereum mainnet = 1)
 
-  # RPC Endpoints
+  # L1 RPC Configuration (required by all components)
   l1RpcUrl: "https://eth-mainnet.alchemyapi.io/v2/YOUR-API-KEY"
   l1BeaconUrl: "https://eth-beacon.example.com"
-  l2RpcUrl: "http://op-geth:8545" # Internal L2 RPC (for components)
-
-  # L1 RPC Configuration
-  l1RpcKind: "alchemy" # alchemy, quicknode, infura, basic_http, etc.
-  l1RpcRateLimit: 0 # requests per second, 0 = disabled
   l1RpcTimeout: "10s"
 
   # Network-specific Configuration Files
@@ -142,10 +140,6 @@ status:
       status: "True"
       reason: "RPCEndpointReachable"
       message: "L1 RPC endpoint is responsive"
-    - type: "L2Connected"
-      status: "True"
-      reason: "RPCEndpointReachable"
-      message: "L2 RPC endpoint is responsive"
 
   observedGeneration: 1
   networkInfo:
@@ -164,12 +158,12 @@ status:
 
 #### Controller Responsibilities
 
-- Validate network configuration and L1/L2 connectivity
-- **Discover and cache contract addresses from L1/L2 chains**
+- Validate network configuration and L1 connectivity
+- **Discover and cache contract addresses from L1 chains**
 - Generate and manage ConfigMaps for rollup config and genesis data
 - Create default JWT secrets if not provided
 - Ensure consistency of shared parameters across dependent components
-- Monitor L1/L2 RPC endpoint health
+- Monitor L1 RPC endpoint health
 
 #### Contract Address Discovery
 
@@ -227,14 +221,8 @@ func (r *OptimismNetworkReconciler) discoverContractAddresses(ctx context.Contex
         }
     }
 
-    // Connect to L2 and verify/discover L2 contracts
-    if network.Spec.L2RpcUrl != "" {
-        l2Client, err := ethclient.Dial(network.Spec.L2RpcUrl)
-        if err == nil {
-            defer l2Client.Close()
-            r.discoverL2Contracts(l2Client, addresses)
-        }
-    }
+    // Note: L2 predeploy contracts are discovered separately by individual components
+    // that need L2 connectivity (OpNode, OpBatcher, etc.)
 
     return addresses, nil
 }
@@ -1120,6 +1108,36 @@ func (r *OpBatcherReconciler) generateConfiguration(opBatcher *OpBatcher, networ
 - Shared JWT secret via mounted volume
 - Simplified service discovery
 - Atomic pod lifecycle management
+
+#### Sequencer Endpoint Resolution Strategy
+
+**Design Decision**: L2 sequencer connectivity is handled through service discovery rather than centralized configuration. This approach provides:
+
+- **Sequencer Nodes**: Point to themselves (`http://127.0.0.1:8545`) for op-geth's `--rollup.sequencerhttp` parameter
+- **Replica Nodes**: Use Kubernetes service discovery to connect to sequencer via `{network-name}-sequencer:8545`
+- **Flexibility**: Components can reference specific sequencers via `sequencerRef` fields
+- **Isolation**: Avoids tight coupling between OptimismNetwork and specific sequencer instances
+
+```go
+func getSequencerEndpoint(opNode *OpNode, network *OptimismNetwork) string {
+    // If this node is a sequencer, point to itself (localhost)
+    if opNode.Spec.OpNode.Sequencer != nil && opNode.Spec.OpNode.Sequencer.Enabled {
+        // Use localhost since op-geth and op-node run in the same pod
+        return "http://127.0.0.1:8545"
+    }
+
+    // For replica nodes, construct sequencer service name based on network
+    // This assumes a sequencer OpNode exists with naming convention: {network-name}-sequencer
+    return fmt.Sprintf("http://%s-sequencer:8545", network.Name)
+}
+```
+
+**Key Benefits**:
+
+- No hardcoded L2 RPC URLs in OptimismNetwork spec
+- Automatic service discovery within Kubernetes cluster
+- Support for multiple sequencers per network
+- Clear separation between L1 (handled by OptimismNetwork) and L2 (handled by OpNode) connectivity
 
 #### StatefulSet for Stateful Components (op-geth, op-challenger)
 

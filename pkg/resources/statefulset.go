@@ -494,8 +494,14 @@ func joinStrings(strs []string) string {
 	return result
 }
 
-func getSequencerEndpoint(_ *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) string {
-	// For now, use the L1 RPC URL as a placeholder
-	// In a full implementation, this would resolve to the actual sequencer endpoint
-	return network.Spec.L1RpcUrl
+func getSequencerEndpoint(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) string {
+	// If this node is a sequencer, point to itself (localhost)
+	if opNode.Spec.OpNode.Sequencer != nil && opNode.Spec.OpNode.Sequencer.Enabled {
+		// Use localhost since op-geth and op-node run in the same pod
+		return "http://127.0.0.1:8545"
+	}
+
+	// For replica nodes, construct sequencer service name based on network
+	// This assumes a sequencer OpNode exists with the naming convention: {network-name}-sequencer
+	return fmt.Sprintf("http://%s-sequencer:8545", network.Name)
 }
