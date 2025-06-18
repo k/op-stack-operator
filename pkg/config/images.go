@@ -19,7 +19,7 @@ const (
 var DefaultImages = ImageConfig{
 	OpGeth:       fmt.Sprintf("%s/op-geth:%s", OptimismRegistry, DefaultOpGethVersion),  // v1.101511.0
 	OpNode:       fmt.Sprintf("%s/op-node:%s", OptimismRegistry, DefaultOpStackVersion), // v1.13.3
-	OpBatcher:    fmt.Sprintf("%s/op-batcher:v1.12.0", OptimismRegistry),                // v1.12.0 (compatible with Isthmus)
+	OpBatcher:    fmt.Sprintf("%s/op-batcher:v1.12.0", OptimismRegistry),                // v1.12.0 compatible
 	OpProposer:   fmt.Sprintf("%s/op-proposer:v1.10.0", OptimismRegistry),               // v1.10.0 (latest stable)
 	OpChallenger: fmt.Sprintf("%s/op-challenger:v1.5.1", OptimismRegistry),              // v1.5.1 (latest)
 }

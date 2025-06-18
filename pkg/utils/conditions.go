@@ -29,7 +29,12 @@ const (
 )
 
 // SetCondition sets or updates a condition in the conditions slice
-func SetCondition(conditions *[]metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) {
+func SetCondition(
+	conditions *[]metav1.Condition,
+	conditionType string,
+	status metav1.ConditionStatus,
+	reason, message string,
+) {
 	now := metav1.NewTime(time.Now())
 
 	// Find existing condition

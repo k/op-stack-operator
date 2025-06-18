@@ -38,8 +38,13 @@ import (
 	"github.com/ethereum-optimism/op-stack-operator/pkg/utils"
 )
 
+// OptimismNetworkFinalizer is the finalizer for OptimismNetwork resources
+const OptimismNetworkFinalizer = "optimismnetwork.optimism.io/finalizer"
+
+// Phase constants for OptimismNetwork status
 const (
-	OptimismNetworkFinalizer = "optimismnetwork.optimism.io/finalizer"
+	PhaseError = "Error"
+	PhaseReady = "Ready"
 )
 
 // OptimismNetworkReconciler reconciles an OptimismNetwork object
@@ -86,7 +91,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Validate configuration
 	if err := r.validateConfiguration(&network); err != nil {
 		utils.SetCondition(&network.Status.Conditions, "ConfigurationValid", metav1.ConditionFalse, "InvalidConfiguration", err.Error())
-		network.Status.Phase = "Error"
+		network.Status.Phase = PhaseError
 		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
@@ -98,7 +103,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Test L1 connectivity
 	if err := r.testL1Connectivity(ctx, &network); err != nil {
 		utils.SetCondition(&network.Status.Conditions, "L1Connected", metav1.ConditionFalse, "L1ConnectionFailed", fmt.Sprintf("Failed to connect to L1: %v", err))
-		network.Status.Phase = "Error"
+		network.Status.Phase = PhaseError
 		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
@@ -111,7 +116,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	addresses, err := r.discoverContractAddresses(ctx, &network)
 	if err != nil {
 		utils.SetCondition(&network.Status.Conditions, "ContractsDiscovered", metav1.ConditionFalse, "DiscoveryFailed", fmt.Sprintf("Failed to discover contracts: %v", err))
-		network.Status.Phase = "Error"
+		network.Status.Phase = PhaseError
 		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
@@ -130,7 +135,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Create ConfigMaps for rollup config and genesis
 	if err := r.reconcileConfigMaps(ctx, &network, addresses); err != nil {
 		logger.Error(err, "failed to reconcile ConfigMaps")
-		network.Status.Phase = "Error"
+		network.Status.Phase = PhaseError
 		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
@@ -138,7 +143,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Update final status
-	network.Status.Phase = "Ready"
+	network.Status.Phase = PhaseReady
 	network.Status.ObservedGeneration = network.Generation
 
 	if err := r.Status().Update(ctx, &network); err != nil {
@@ -336,7 +341,7 @@ func (r *OptimismNetworkReconciler) generateRollupConfig(network *optimismv1alph
 }
 
 // generateGenesisConfig generates a ConfigMap with L2 genesis configuration
-func (r *OptimismNetworkReconciler) generateGenesisConfig(network *optimismv1alpha1.OptimismNetwork, addresses *optimismv1alpha1.NetworkContractAddresses) string {
+func (r *OptimismNetworkReconciler) generateGenesisConfig(network *optimismv1alpha1.OptimismNetwork, _ *optimismv1alpha1.NetworkContractAddresses) string {
 	// Generate a basic L2 genesis configuration
 	// In a real implementation, this would create a proper genesis.json structure
 	return fmt.Sprintf(`{

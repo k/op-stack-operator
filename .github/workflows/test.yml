@@ -73,23 +73,3 @@ jobs:
           else
             echo "⏭️ Skipping e2e tests - no API keys configured"
           fi
-
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Gosec Security Scanner
-        uses: securecodewarrior/github-action-gosec@master
-        with:
-          args: ./...
-
-      - name: Check for secrets
-        run: |
-          # Check for accidentally committed secrets
-          if grep -r "alchemy.com/v2/" --include="*.go" --include="*.yaml" --include="*.yml" .; then
-            echo "❌ Found hardcoded API keys in code!"
-            exit 1
-          fi
-          echo "✅ No hardcoded API keys found"

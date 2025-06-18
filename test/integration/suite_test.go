@@ -37,7 +37,7 @@ import (
 
 	optimismv1alpha1 "github.com/ethereum-optimism/op-stack-operator/api/v1alpha1"
 	"github.com/ethereum-optimism/op-stack-operator/internal/controller"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -88,7 +88,7 @@ var _ = BeforeSuite(func() {
 	err = optimismv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

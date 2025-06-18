@@ -32,7 +32,10 @@ func NewContractDiscoveryService(cacheTimeout time.Duration) *ContractDiscoveryS
 }
 
 // DiscoverContracts discovers contract addresses for the given OptimismNetwork
-func (c *ContractDiscoveryService) DiscoverContracts(ctx context.Context, network *optimismv1alpha1.OptimismNetwork) (*optimismv1alpha1.NetworkContractAddresses, error) {
+func (c *ContractDiscoveryService) DiscoverContracts(
+	ctx context.Context,
+	network *optimismv1alpha1.OptimismNetwork,
+) (*optimismv1alpha1.NetworkContractAddresses, error) {
 	// Check cache first
 	cacheKey := fmt.Sprintf("%s-%d", network.Spec.NetworkName, network.Spec.ChainID)
 	if cached, exists := c.cache[cacheKey]; exists && !c.isCacheExpired(cached) {
@@ -88,10 +91,17 @@ func (c *ContractDiscoveryService) DiscoverContracts(ctx context.Context, networ
 }
 
 // autoDiscoverContracts attempts multiple discovery strategies automatically
-func (c *ContractDiscoveryService) autoDiscoverContracts(ctx context.Context, network *optimismv1alpha1.OptimismNetwork) (*optimismv1alpha1.NetworkContractAddresses, error) {
+func (c *ContractDiscoveryService) autoDiscoverContracts(
+	ctx context.Context,
+	network *optimismv1alpha1.OptimismNetwork,
+) (*optimismv1alpha1.NetworkContractAddresses, error) {
 	// Strategy 1: Query SystemConfig contract if provided
 	if network.Spec.ContractAddresses != nil && network.Spec.ContractAddresses.SystemConfigAddr != "" {
-		addresses, err := c.discoverFromSystemConfig(ctx, network.Spec.L1RpcUrl, network.Spec.ContractAddresses.SystemConfigAddr)
+		addresses, err := c.discoverFromSystemConfig(
+			ctx,
+			network.Spec.L1RpcUrl,
+			network.Spec.ContractAddresses.SystemConfigAddr,
+		)
 		if err == nil {
 			addresses.DiscoveryMethod = "system-config"
 			return addresses, nil
@@ -117,7 +127,11 @@ func (c *ContractDiscoveryService) autoDiscoverContracts(ctx context.Context, ne
 }
 
 // discoverFromSystemConfig queries the SystemConfig contract for other contract addresses
-func (c *ContractDiscoveryService) discoverFromSystemConfig(ctx context.Context, l1RpcUrl, systemConfigAddr string) (*optimismv1alpha1.NetworkContractAddresses, error) {
+func (c *ContractDiscoveryService) discoverFromSystemConfig(
+	_ context.Context,
+	l1RpcUrl,
+	systemConfigAddr string,
+) (*optimismv1alpha1.NetworkContractAddresses, error) {
 	client, err := ethclient.Dial(l1RpcUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to L1 RPC: %w", err)
@@ -140,14 +154,19 @@ func (c *ContractDiscoveryService) discoverFromSystemConfig(ctx context.Context,
 }
 
 // discoverFromSuperchainRegistry discovers addresses from the Superchain Registry
-func (c *ContractDiscoveryService) discoverFromSuperchainRegistry(chainID int64) (*optimismv1alpha1.NetworkContractAddresses, error) {
+func (c *ContractDiscoveryService) discoverFromSuperchainRegistry(
+	chainID int64,
+) (*optimismv1alpha1.NetworkContractAddresses, error) {
 	// Placeholder implementation - in a full implementation, this would query
 	// the Superchain Registry API or embedded registry data
 	return nil, fmt.Errorf("superchain registry discovery not yet implemented")
 }
 
 // getWellKnownAddresses returns well-known contract addresses for official networks
-func (c *ContractDiscoveryService) getWellKnownAddresses(networkName string, chainID int64) *optimismv1alpha1.NetworkContractAddresses {
+func (c *ContractDiscoveryService) getWellKnownAddresses(
+	networkName string,
+	chainID int64,
+) *optimismv1alpha1.NetworkContractAddresses {
 	switch {
 	case networkName == "op-mainnet" || chainID == 10:
 		return &optimismv1alpha1.NetworkContractAddresses{
@@ -197,7 +216,9 @@ func (c *ContractDiscoveryService) getWellKnownAddresses(networkName string, cha
 }
 
 // getManualAddresses returns manually configured addresses
-func (c *ContractDiscoveryService) getManualAddresses(network *optimismv1alpha1.OptimismNetwork) *optimismv1alpha1.NetworkContractAddresses {
+func (c *ContractDiscoveryService) getManualAddresses(
+	network *optimismv1alpha1.OptimismNetwork,
+) *optimismv1alpha1.NetworkContractAddresses {
 	if network.Spec.ContractAddresses == nil {
 		return nil
 	}
@@ -208,41 +229,6 @@ func (c *ContractDiscoveryService) getManualAddresses(network *optimismv1alpha1.
 		DisputeGameFactoryAddr: network.Spec.ContractAddresses.DisputeGameFactoryAddr,
 		OptimismPortalAddr:     network.Spec.ContractAddresses.OptimismPortalAddr,
 		DiscoveryMethod:        "manual",
-	}
-}
-
-// mergeAddresses merges contract addresses, with target taking precedence
-func (c *ContractDiscoveryService) mergeAddresses(target, source *optimismv1alpha1.NetworkContractAddresses) {
-	if source == nil {
-		return
-	}
-
-	if target.SystemConfigAddr == "" && source.SystemConfigAddr != "" {
-		target.SystemConfigAddr = source.SystemConfigAddr
-	}
-	if target.L2OutputOracleAddr == "" && source.L2OutputOracleAddr != "" {
-		target.L2OutputOracleAddr = source.L2OutputOracleAddr
-	}
-	if target.DisputeGameFactoryAddr == "" && source.DisputeGameFactoryAddr != "" {
-		target.DisputeGameFactoryAddr = source.DisputeGameFactoryAddr
-	}
-	if target.OptimismPortalAddr == "" && source.OptimismPortalAddr != "" {
-		target.OptimismPortalAddr = source.OptimismPortalAddr
-	}
-	if target.L1CrossDomainMessengerAddr == "" && source.L1CrossDomainMessengerAddr != "" {
-		target.L1CrossDomainMessengerAddr = source.L1CrossDomainMessengerAddr
-	}
-	if target.L1StandardBridgeAddr == "" && source.L1StandardBridgeAddr != "" {
-		target.L1StandardBridgeAddr = source.L1StandardBridgeAddr
-	}
-	if target.L2CrossDomainMessengerAddr == "" && source.L2CrossDomainMessengerAddr != "" {
-		target.L2CrossDomainMessengerAddr = source.L2CrossDomainMessengerAddr
-	}
-	if target.L2StandardBridgeAddr == "" && source.L2StandardBridgeAddr != "" {
-		target.L2StandardBridgeAddr = source.L2StandardBridgeAddr
-	}
-	if target.L2ToL1MessagePasserAddr == "" && source.L2ToL1MessagePasserAddr != "" {
-		target.L2ToL1MessagePasserAddr = source.L2ToL1MessagePasserAddr
 	}
 }
 

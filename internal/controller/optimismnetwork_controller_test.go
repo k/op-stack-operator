@@ -165,12 +165,3 @@ var _ = Describe("OptimismNetwork Controller Unit Tests", func() {
 		})
 	})
 })
-
-// Helper functions for unit tests
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func int64Ptr(i int64) *int64 {
-	return &i
-}
