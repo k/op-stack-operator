@@ -21,18 +21,23 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	optimismv1alpha1 "github.com/ethereum-optimism/op-stack-operator/api/v1alpha1"
+	"github.com/ethereum-optimism/op-stack-operator/pkg/discovery"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -45,6 +50,7 @@ var (
 	testEnv   *envtest.Environment
 	cfg       *rest.Config
 	k8sClient client.Client
+	mgr       manager.Manager
 )
 
 func TestControllers(t *testing.T) {
@@ -83,6 +89,40 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	By("setting up the controller manager")
+	mgr, err = ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+		// Disable metrics to avoid port conflicts in tests
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+		// Use a different port for health checks
+		HealthProbeBindAddress: ":0",
+	})
+	Expect(err).ToNot(HaveOccurred())
+
+	By("setting up controllers")
+	err = (&OptimismNetworkReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		DiscoveryService: discovery.NewContractDiscoveryService(24 * time.Hour),
+	}).SetupWithManager(mgr)
+	Expect(err).ToNot(HaveOccurred())
+
+	// +kubebuilder:scaffold:builder
+
+	By("starting the controller manager")
+	go func() {
+		defer GinkgoRecover()
+		err = mgr.Start(ctx)
+		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+	}()
+
+	// Wait for the manager to be ready
+	Eventually(func() bool {
+		return mgr.GetCache().WaitForCacheSync(ctx)
+	}, time.Second*10, time.Millisecond*100).Should(BeTrue())
 })
 
 var _ = AfterSuite(func() {

@@ -2,8 +2,11 @@ apiVersion: optimism.optimism.io/v1alpha1
 kind: OptimismNetwork
 metadata:
   labels:
-    app.kubernetes.io/name: op-stack-operator
+    app.kubernetes.io/name: optimismnetwork
+    app.kubernetes.io/instance: op-sepolia
+    app.kubernetes.io/part-of: op-stack-operator
     app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: op-stack-operator
   name: op-sepolia
   namespace: optimism-system
 spec:
@@ -12,28 +15,27 @@ spec:
   chainID: 11155420
   l1ChainID: 11155111
 
-  # RPC Endpoints
-  l1RpcUrl: "https://sepolia.infura.io/v3/YOUR-API-KEY"
+  # L1 RPC Configuration (required by all components)
+  l1RpcUrl: "https://eth-sepolia.g.alchemy.com/v2/zeFYT4eQdrTCht4MM6BhQFqWzZ81QO8O"
   l1BeaconUrl: "https://sepolia-beacon.example.com"
-  l2RpcUrl: "http://op-sepolia-node:8545"
-
-  # L1 RPC Configuration
-  l1RpcKind: "infura"
-  l1RpcRateLimit: 10
   l1RpcTimeout: "10s"
 
   # Network-specific Configuration Files
   rollupConfig:
-    autoDiscover: true
+    autoDiscover: true  # Controller will generate rollup config
+
   l2Genesis:
-    autoDiscover: true
+    autoDiscover: true  # Controller will generate genesis config
 
-  # Contract Address Discovery (will use well-known addresses for op-sepolia)
+  # Contract Address Discovery
   contractAddresses:
-    discoveryMethod: "well-known"
+    discoveryMethod: "auto"  # auto, superchain-registry, well-known, manual
     cacheTimeout: "24h"
+    
+    # Optional: If you know the SystemConfig address, it helps with discovery
+    systemConfigAddr: "0x034edD2A225f7f429A63E0f1D2084B9E0A93b538"
 
-  # Shared Configuration
+  # Shared Configuration for all components
   sharedConfig:
     # Logging
     logging:
@@ -47,7 +49,7 @@ spec:
       port: 7300
       path: "/metrics"
 
-    # Resource Defaults
+    # Resource Defaults (can be overridden by individual components)
     resources:
       requests:
         cpu: "100m"

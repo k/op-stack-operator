@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -100,35 +99,14 @@ func (c *ContractDiscoveryService) autoDiscoverContracts(ctx context.Context, ne
 		// Log warning but continue with other methods
 	}
 
-	// Strategy 2: Query L2 predeploys (if L2 RPC available)
-	if network.Spec.L2RpcUrl != "" {
-		l2Addresses, err := c.queryL2Predeploys(ctx, network.Spec.L2RpcUrl)
-		if err == nil {
-			// Combine with other discovery methods for L1 contracts
-			addresses := &optimismv1alpha1.NetworkContractAddresses{
-				L2CrossDomainMessengerAddr: l2Addresses.L2CrossDomainMessengerAddr,
-				L2StandardBridgeAddr:       l2Addresses.L2StandardBridgeAddr,
-				L2ToL1MessagePasserAddr:    l2Addresses.L2ToL1MessagePasserAddr,
-			}
-
-			// Try to get L1 contracts from other methods
-			if l1Addresses := c.getWellKnownAddresses(network.Spec.NetworkName, network.Spec.ChainID); l1Addresses != nil {
-				c.mergeAddresses(addresses, l1Addresses)
-			}
-
-			addresses.DiscoveryMethod = "l2-predeploys"
-			return addresses, nil
-		}
-	}
-
-	// Strategy 3: Query Superchain Registry as fallback
+	// Strategy 2: Query Superchain Registry as fallback
 	registryAddresses, err := c.discoverFromSuperchainRegistry(network.Spec.ChainID)
 	if err == nil && registryAddresses != nil {
 		registryAddresses.DiscoveryMethod = "superchain-registry"
 		return registryAddresses, nil
 	}
 
-	// Strategy 4: Fall back to well-known addresses
+	// Strategy 3: Fall back to well-known addresses
 	wellKnownAddresses := c.getWellKnownAddresses(network.Spec.NetworkName, network.Spec.ChainID)
 	if wellKnownAddresses != nil {
 		wellKnownAddresses.DiscoveryMethod = "well-known"
@@ -156,43 +134,6 @@ func (c *ContractDiscoveryService) discoverFromSystemConfig(ctx context.Context,
 		// L2OutputOracleAddr: systemConfig.L2OutputOracle().Hex(),
 		// DisputeGameFactoryAddr: systemConfig.DisputeGameFactory().Hex(),
 		// OptimismPortalAddr: systemConfig.OptimismPortal().Hex(),
-	}
-
-	return addresses, nil
-}
-
-// queryL2Predeploys queries L2 predeploy contracts (always at fixed addresses)
-func (c *ContractDiscoveryService) queryL2Predeploys(ctx context.Context, l2RpcUrl string) (*optimismv1alpha1.NetworkContractAddresses, error) {
-	client, err := ethclient.Dial(l2RpcUrl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to L2 RPC: %w", err)
-	}
-	defer client.Close()
-
-	addresses := &optimismv1alpha1.NetworkContractAddresses{}
-
-	// L2 predeploy addresses are standardized across all OP Stack chains
-	predeploys := map[string]string{
-		"L2CrossDomainMessenger": "0x4200000000000000000000000000000000000007",
-		"L2StandardBridge":       "0x4200000000000000000000000000000000000010",
-		"L2ToL1MessagePasser":    "0x4200000000000000000000000000000000000016",
-	}
-
-	// Verify these contracts exist on the L2
-	for name, addr := range predeploys {
-		code, err := client.CodeAt(ctx, common.HexToAddress(addr), nil)
-		if err != nil || len(code) == 0 {
-			return nil, fmt.Errorf("predeploy contract %s not found at %s", name, addr)
-		}
-
-		switch name {
-		case "L2CrossDomainMessenger":
-			addresses.L2CrossDomainMessengerAddr = addr
-		case "L2StandardBridge":
-			addresses.L2StandardBridgeAddr = addr
-		case "L2ToL1MessagePasser":
-			addresses.L2ToL1MessagePasserAddr = addr
-		}
 	}
 
 	return addresses, nil

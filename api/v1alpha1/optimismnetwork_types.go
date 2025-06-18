@@ -33,15 +33,10 @@ type OptimismNetworkSpec struct {
 	ChainID     int64  `json:"chainID"`
 	L1ChainID   int64  `json:"l1ChainID"`
 
-	// RPC Endpoints
-	L1RpcUrl    string `json:"l1RpcUrl"`
-	L1BeaconUrl string `json:"l1BeaconUrl,omitempty"`
-	L2RpcUrl    string `json:"l2RpcUrl,omitempty"`
-
-	// L1 RPC Configuration
-	L1RpcKind      string        `json:"l1RpcKind,omitempty"`
-	L1RpcRateLimit int           `json:"l1RpcRateLimit,omitempty"`
-	L1RpcTimeout   time.Duration `json:"l1RpcTimeout,omitempty"`
+	// L1 RPC Configuration (required by all components)
+	L1RpcUrl     string        `json:"l1RpcUrl"`
+	L1BeaconUrl  string        `json:"l1BeaconUrl,omitempty"`
+	L1RpcTimeout time.Duration `json:"l1RpcTimeout,omitempty"`
 
 	// Network-specific Configuration Files
 	RollupConfig *ConfigSource `json:"rollupConfig,omitempty"`
@@ -151,7 +146,7 @@ type NetworkContractAddresses struct {
 	L1CrossDomainMessengerAddr string `json:"l1CrossDomainMessengerAddr,omitempty"`
 	L1StandardBridgeAddr       string `json:"l1StandardBridgeAddr,omitempty"`
 
-	// L2 Contracts (predeploys)
+	// L2 Contracts (predeploys - same across all OP Stack chains)
 	L2CrossDomainMessengerAddr string `json:"l2CrossDomainMessengerAddr,omitempty"`
 	L2StandardBridgeAddr       string `json:"l2StandardBridgeAddr,omitempty"`
 	L2ToL1MessagePasserAddr    string `json:"l2ToL1MessagePasserAddr,omitempty"`

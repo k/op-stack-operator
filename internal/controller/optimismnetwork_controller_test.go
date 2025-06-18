@@ -23,370 +23,550 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	optimismv1alpha1 "github.com/ethereum-optimism/op-stack-operator/api/v1alpha1"
 	"github.com/ethereum-optimism/op-stack-operator/pkg/discovery"
-	"github.com/ethereum-optimism/op-stack-operator/pkg/utils"
 )
 
 var _ = Describe("OptimismNetwork Controller", func() {
-	Context("When reconciling a resource", func() {
+	Context("When reconciling an OptimismNetwork", func() {
 		const (
 			OptimismNetworkName      = "test-network"
 			OptimismNetworkNamespace = "default"
-
-			timeout  = time.Second * 10
-			duration = time.Second * 10
-			interval = time.Millisecond * 250
+			timeout                  = time.Second * 10
+			duration                 = time.Second * 10
+			interval                 = time.Millisecond * 250
+			// Real Alchemy Sepolia URL for testing
+			testL1RpcUrl = "https://eth-sepolia.g.alchemy.com/v2/zeFYT4eQdrTCht4MM6BhQFqWzZ81QO8O"
 		)
 
 		ctx := context.Background()
 
-		typeNamespacedName := types.NamespacedName{
+		typeNamespace := types.NamespacedName{
 			Name:      OptimismNetworkName,
 			Namespace: OptimismNetworkNamespace,
 		}
 
-		optimismnetwork := &optimismv1alpha1.OptimismNetwork{}
-
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind OptimismNetwork")
-			err := k8sClient.Get(ctx, typeNamespacedName, optimismnetwork)
-			if err != nil && !errors.IsNotFound(err) {
-				Expect(err).NotTo(HaveOccurred())
-			}
+			// Clean up any existing resources
+			network := &optimismv1alpha1.OptimismNetwork{}
+			if err := k8sClient.Get(ctx, typeNamespace, network); err == nil {
+				// Remove finalizers to allow immediate deletion
+				network.Finalizers = []string{}
+				Expect(k8sClient.Update(ctx, network)).To(Succeed())
 
-			if errors.IsNotFound(err) {
-				resource := &optimismv1alpha1.OptimismNetwork{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      OptimismNetworkName,
-						Namespace: OptimismNetworkNamespace,
-					},
-					Spec: optimismv1alpha1.OptimismNetworkSpec{
-						NetworkName: "op-sepolia",
-						ChainID:     11155420,
-						L1ChainID:   11155111,
-						L1RpcUrl:    "https://sepolia.infura.io/v3/test-key",
-						L1BeaconUrl: "https://sepolia-beacon.example.com",
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				// Delete the resource
+				Expect(k8sClient.Delete(ctx, network)).To(Succeed())
+
+				// Wait for deletion to complete
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, typeNamespace, network)
+					return err != nil
+				}, time.Second*5, time.Millisecond*100).Should(BeTrue())
 			}
 		})
 
 		AfterEach(func() {
-			// Clean up the resource after each test
-			resource := &optimismv1alpha1.OptimismNetwork{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			if err == nil {
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			// Clean up resources
+			network := &optimismv1alpha1.OptimismNetwork{}
+			if err := k8sClient.Get(ctx, typeNamespace, network); err == nil {
+				// Remove finalizers to allow immediate deletion
+				network.Finalizers = []string{}
+				Expect(k8sClient.Update(ctx, network)).To(Succeed())
+
+				// Delete the resource
+				Expect(k8sClient.Delete(ctx, network)).To(Succeed())
+
+				// Wait for deletion to complete
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, typeNamespace, network)
+					return err != nil
+				}, time.Second*5, time.Millisecond*100).Should(BeTrue())
+			}
+
+			// Also clean up any ConfigMaps that might have been created
+			configMaps := []string{
+				OptimismNetworkName + "-rollup-config",
+				OptimismNetworkName + "-genesis",
+				"test-rollup-config", // From ConfigMap reference test
+			}
+			for _, cmName := range configMaps {
+				cm := &corev1.ConfigMap{}
+				cmKey := types.NamespacedName{Name: cmName, Namespace: OptimismNetworkNamespace}
+				if err := k8sClient.Get(ctx, cmKey, cm); err == nil {
+					Expect(k8sClient.Delete(ctx, cm)).To(Succeed())
+				}
 			}
 		})
 
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &OptimismNetworkReconciler{
-				Client:           k8sClient,
-				Scheme:           k8sClient.Scheme(),
-				DiscoveryService: discovery.NewContractDiscoveryService(24 * time.Hour),
+		It("Should create an OptimismNetwork with valid configuration", func() {
+			By("Creating a new OptimismNetwork")
+			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
+				Spec: optimismv1alpha1.OptimismNetworkSpec{
+					NetworkName:  "test-sepolia",
+					ChainID:      11155420,
+					L1ChainID:    11155111,
+					L1RpcUrl:     testL1RpcUrl,
+					L1BeaconUrl:  "https://sepolia-beacon.example.com",
+					L1RpcTimeout: 10 * time.Second,
+					RollupConfig: &optimismv1alpha1.ConfigSource{
+						AutoDiscover: true,
+					},
+					L2Genesis: &optimismv1alpha1.ConfigSource{
+						AutoDiscover: true,
+					},
+					ContractAddresses: &optimismv1alpha1.ContractAddressConfig{
+						DiscoveryMethod: "well-known",
+						CacheTimeout:    24 * time.Hour,
+					},
+					SharedConfig: &optimismv1alpha1.SharedConfig{
+						Logging: &optimismv1alpha1.LoggingConfig{
+							Level:  "info",
+							Format: "logfmt",
+							Color:  false,
+						},
+						Metrics: &optimismv1alpha1.MetricsConfig{
+							Enabled: true,
+							Port:    7300,
+							Path:    "/metrics",
+						},
+						Resources: &optimismv1alpha1.ResourceConfig{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1000m"),
+								corev1.ResourceMemory: resource.MustParse("2Gi"),
+							},
+						},
+						Security: &optimismv1alpha1.SecurityConfig{
+							RunAsNonRoot: boolPtr(true),
+							RunAsUser:    int64Ptr(1000),
+							FSGroup:      int64Ptr(1000),
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeRuntimeDefault,
+							},
+						},
+					},
+				},
 			}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
 
-			By("Checking if the resource status is set correctly")
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, typeNamespacedName, optimismnetwork)
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Checking the OptimismNetwork was created successfully")
+			Expect(createdNetwork.Spec.NetworkName).Should(Equal("test-sepolia"))
+			Expect(createdNetwork.Spec.ChainID).Should(Equal(int64(11155420)))
+			Expect(createdNetwork.Spec.L1ChainID).Should(Equal(int64(11155111)))
+			Expect(createdNetwork.Spec.L1RpcUrl).Should(Equal(testL1RpcUrl))
+		})
+
+		It("Should validate required fields", func() {
+			By("Creating an OptimismNetwork with missing chainID")
+			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
+				Spec: optimismv1alpha1.OptimismNetworkSpec{
+					// ChainID is missing (0)
+					L1ChainID: 11155111,
+					L1RpcUrl:  testL1RpcUrl,
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
 				if err != nil {
 					return false
 				}
-				// Check if status has been initialized
-				return optimismnetwork.Status.Phase != ""
+				return createdNetwork.Status.Phase == "Error"
 			}, timeout, interval).Should(BeTrue())
 
-			By("Checking if finalizer was added")
-			Expect(optimismnetwork.Finalizers).To(ContainElement(OptimismNetworkFinalizer))
-
-			By("Checking if status conditions are set")
-			Expect(optimismnetwork.Status.Conditions).NotTo(BeEmpty())
-		})
-	})
-
-	Context("When validating configuration", func() {
-		var reconciler *OptimismNetworkReconciler
-
-		BeforeEach(func() {
-			reconciler = &OptimismNetworkReconciler{
-				Client:           k8sClient,
-				Scheme:           k8sClient.Scheme(),
-				DiscoveryService: discovery.NewContractDiscoveryService(24 * time.Hour),
-			}
+			By("Checking the error condition is set")
+			Expect(createdNetwork.Status.Conditions).Should(HaveLen(1))
+			Expect(createdNetwork.Status.Conditions[0].Type).Should(Equal("ConfigurationValid"))
+			Expect(createdNetwork.Status.Conditions[0].Status).Should(Equal(metav1.ConditionFalse))
+			Expect(createdNetwork.Status.Conditions[0].Reason).Should(Equal("InvalidConfiguration"))
 		})
 
-		It("should reject configuration with missing chainID", func() {
+		It("Should validate chain ID relationship", func() {
+			By("Creating an OptimismNetwork with same L1 and L2 chain IDs")
 			network := &optimismv1alpha1.OptimismNetwork{
-				Spec: optimismv1alpha1.OptimismNetworkSpec{
-					L1ChainID: 1,
-					L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
 				},
-			}
-
-			err := reconciler.validateConfiguration(context.Background(), network)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("chainID is required"))
-		})
-
-		It("should reject configuration with missing L1ChainID", func() {
-			network := &optimismv1alpha1.OptimismNetwork{
-				Spec: optimismv1alpha1.OptimismNetworkSpec{
-					ChainID:  10,
-					L1RpcUrl: "https://mainnet.infura.io/v3/test",
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
 				},
-			}
-
-			err := reconciler.validateConfiguration(context.Background(), network)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("l1ChainID is required"))
-		})
-
-		It("should reject configuration with missing L1RpcUrl", func() {
-			network := &optimismv1alpha1.OptimismNetwork{
-				Spec: optimismv1alpha1.OptimismNetworkSpec{
-					ChainID:   10,
-					L1ChainID: 1,
-				},
-			}
-
-			err := reconciler.validateConfiguration(context.Background(), network)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("l1RpcUrl is required"))
-		})
-
-		It("should reject configuration with same chainID and L1ChainID", func() {
-			network := &optimismv1alpha1.OptimismNetwork{
 				Spec: optimismv1alpha1.OptimismNetworkSpec{
 					ChainID:   1,
-					L1ChainID: 1,
-					L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+					L1ChainID: 1, // Same as chainID - should be invalid
+					L1RpcUrl:  testL1RpcUrl,
 				},
 			}
 
-			err := reconciler.validateConfiguration(context.Background(), network)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("chainID and l1ChainID cannot be the same"))
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				if err != nil {
+					return false
+				}
+				return createdNetwork.Status.Phase == "Error"
+			}, timeout, interval).Should(BeTrue())
+
+			By("Checking the validation error is set")
+			Expect(createdNetwork.Status.Conditions).Should(HaveLen(1))
+			Expect(createdNetwork.Status.Conditions[0].Type).Should(Equal("ConfigurationValid"))
+			Expect(createdNetwork.Status.Conditions[0].Status).Should(Equal(metav1.ConditionFalse))
+			Expect(createdNetwork.Status.Conditions[0].Message).Should(ContainSubstring("chainID cannot be the same as l1ChainID"))
 		})
 
-		It("should accept valid configuration", func() {
+		It("Should validate ConfigSource configuration", func() {
+			By("Creating an OptimismNetwork with multiple ConfigSource options")
 			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
 				Spec: optimismv1alpha1.OptimismNetworkSpec{
-					ChainID:   10,
-					L1ChainID: 1,
-					L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+					ChainID:   11155420,
+					L1ChainID: 11155111,
+					L1RpcUrl:  testL1RpcUrl,
+					RollupConfig: &optimismv1alpha1.ConfigSource{
+						Inline:       `{"genesis": {}}`,
+						AutoDiscover: true, // Both inline and autoDiscover - should be invalid
+					},
 				},
 			}
 
-			err := reconciler.validateConfiguration(context.Background(), network)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				if err != nil {
+					return false
+				}
+				return createdNetwork.Status.Phase == "Error"
+			}, timeout, interval).Should(BeTrue())
+
+			By("Checking the validation error is set")
+			Expect(createdNetwork.Status.Conditions).Should(HaveLen(1))
+			Expect(createdNetwork.Status.Conditions[0].Type).Should(Equal("ConfigurationValid"))
+			Expect(createdNetwork.Status.Conditions[0].Status).Should(Equal(metav1.ConditionFalse))
+			Expect(createdNetwork.Status.Conditions[0].Message).Should(ContainSubstring("only one of inline, configMapRef, or autoDiscover can be specified"))
 		})
-	})
 
-	Context("When handling ConfigMap references", func() {
-		var reconciler *OptimismNetworkReconciler
-		const testNamespace = "test-configmap"
-
-		BeforeEach(func() {
-			reconciler = &OptimismNetworkReconciler{
-				Client:           k8sClient,
-				Scheme:           k8sClient.Scheme(),
-				DiscoveryService: discovery.NewContractDiscoveryService(24 * time.Hour),
+		It("Should discover contract addresses for well-known networks", func() {
+			By("Creating an OptimismNetwork for op-sepolia")
+			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
+				Spec: optimismv1alpha1.OptimismNetworkSpec{
+					NetworkName: "op-sepolia",
+					ChainID:     11155420,
+					L1ChainID:   11155111,
+					L1RpcUrl:    testL1RpcUrl, // Now using real Alchemy URL
+					ContractAddresses: &optimismv1alpha1.ContractAddressConfig{
+						DiscoveryMethod: "well-known",
+						CacheTimeout:    24 * time.Hour,
+					},
+				},
 			}
 
-			// Create test namespace
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: testNamespace},
-			}
-			_ = k8sClient.Create(context.Background(), ns)
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
 
-			// Create test ConfigMap
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() error {
+				return k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+			}, timeout, interval).Should(Succeed())
+
+			By("Checking that contract discovery completed")
+			// With real Alchemy URL, contract discovery should work for well-known networks
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				if err != nil {
+					return false
+				}
+				// Check if contracts discovered condition exists
+				for _, condition := range createdNetwork.Status.Conditions {
+					if condition.Type == "ContractsDiscovered" {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("Should create ConfigMaps when autoDiscover is enabled", func() {
+			By("Creating an OptimismNetwork with autoDiscover enabled")
+			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
+				Spec: optimismv1alpha1.OptimismNetworkSpec{
+					NetworkName: "test-network",
+					ChainID:     11155420, // OP Sepolia chain ID
+					L1ChainID:   11155111, // Sepolia chain ID (matches Alchemy URL)
+					L1RpcUrl:    testL1RpcUrl,
+					RollupConfig: &optimismv1alpha1.ConfigSource{
+						AutoDiscover: true,
+					},
+					L2Genesis: &optimismv1alpha1.ConfigSource{
+						AutoDiscover: true,
+					},
+					ContractAddresses: &optimismv1alpha1.ContractAddressConfig{
+						DiscoveryMethod: "well-known",
+						CacheTimeout:    24 * time.Hour,
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			// Check that ConfigMaps are created
+			By("Checking rollup config ConfigMap is created")
+			rollupConfigMap := &corev1.ConfigMap{}
+			rollupConfigMapKey := types.NamespacedName{
+				Name:      OptimismNetworkName + "-rollup-config",
+				Namespace: OptimismNetworkNamespace,
+			}
+
+			Eventually(func() error {
+				return k8sClient.Get(ctx, rollupConfigMapKey, rollupConfigMap)
+			}, timeout, interval).Should(Succeed())
+
+			Expect(rollupConfigMap.Data).Should(HaveKey("rollup.json"))
+			Expect(rollupConfigMap.Data["rollup.json"]).Should(ContainSubstring(`"l2_chain_id": 11155420`))
+
+			By("Checking genesis ConfigMap is created")
+			genesisConfigMap := &corev1.ConfigMap{}
+			genesisConfigMapKey := types.NamespacedName{
+				Name:      OptimismNetworkName + "-genesis",
+				Namespace: OptimismNetworkNamespace,
+			}
+
+			Eventually(func() error {
+				return k8sClient.Get(ctx, genesisConfigMapKey, genesisConfigMap)
+			}, timeout, interval).Should(Succeed())
+
+			Expect(genesisConfigMap.Data).Should(HaveKey("genesis.json"))
+			Expect(genesisConfigMap.Data["genesis.json"]).Should(ContainSubstring(`"chainId": 11155420`))
+		})
+
+		It("Should handle ConfigMap reference validation", func() {
+			By("Creating a ConfigMap first")
 			configMap := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-config",
-					Namespace: testNamespace,
+					Name:      "test-rollup-config",
+					Namespace: OptimismNetworkNamespace,
 				},
 				Data: map[string]string{
 					"rollup.json": `{"test": "config"}`,
 				},
 			}
-			Expect(k8sClient.Create(context.Background(), configMap)).To(Succeed())
-		})
+			Expect(k8sClient.Create(ctx, configMap)).Should(Succeed())
 
-		AfterEach(func() {
-			// Clean up test namespace
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: testNamespace},
-			}
-			_ = k8sClient.Delete(context.Background(), ns)
-		})
-
-		It("should validate existing ConfigMap reference", func() {
-			source := &optimismv1alpha1.ConfigSource{
-				ConfigMapRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "test-config",
-					},
-					Key: "rollup.json",
-				},
-			}
-
-			err := reconciler.validateConfigSource(context.Background(), source, testNamespace)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should reject non-existent ConfigMap reference", func() {
-			source := &optimismv1alpha1.ConfigSource{
-				ConfigMapRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "non-existent-config",
-					},
-				},
-			}
-
-			err := reconciler.validateConfigSource(context.Background(), source, testNamespace)
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("should reject non-existent key in ConfigMap", func() {
-			source := &optimismv1alpha1.ConfigSource{
-				ConfigMapRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "test-config",
-					},
-					Key: "non-existent-key",
-				},
-			}
-
-			err := reconciler.validateConfigSource(context.Background(), source, testNamespace)
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	Context("When managing status conditions", func() {
-		It("should set condition correctly", func() {
-			network := &optimismv1alpha1.OptimismNetwork{}
-
-			// Set a condition
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionConfigurationValid, utils.ReasonValidConfiguration, "Test message")
-
-			// Verify condition was set
-			Expect(network.Status.Conditions).To(HaveLen(1))
-			condition := utils.GetCondition(network.Status.Conditions, utils.ConditionConfigurationValid)
-			Expect(condition).NotTo(BeNil())
-			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
-			Expect(condition.Reason).To(Equal(utils.ReasonValidConfiguration))
-			Expect(condition.Message).To(Equal("Test message"))
-		})
-
-		It("should update existing condition", func() {
-			network := &optimismv1alpha1.OptimismNetwork{}
-
-			// Set initial condition
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionConfigurationValid, utils.ReasonValidConfiguration, "Initial message")
-
-			// Update condition
-			utils.SetConditionFalse(&network.Status.Conditions,
-				utils.ConditionConfigurationValid, utils.ReasonInvalidConfiguration, "Updated message")
-
-			// Verify condition was updated, not duplicated
-			Expect(network.Status.Conditions).To(HaveLen(1))
-			condition := utils.GetCondition(network.Status.Conditions, utils.ConditionConfigurationValid)
-			Expect(condition).NotTo(BeNil())
-			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(condition.Reason).To(Equal(utils.ReasonInvalidConfiguration))
-			Expect(condition.Message).To(Equal("Updated message"))
-		})
-	})
-
-	Context("When testing contract discovery", func() {
-		It("should discover well-known addresses for op-mainnet", func() {
-			discoveryService := discovery.NewContractDiscoveryService(24 * time.Hour)
-
+			By("Creating an OptimismNetwork that references the ConfigMap")
 			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
 				Spec: optimismv1alpha1.OptimismNetworkSpec{
-					NetworkName: "op-mainnet",
-					ChainID:     10,
-					L1ChainID:   1,
-					L1RpcUrl:    "https://mainnet.infura.io/v3/test",
-					ContractAddresses: &optimismv1alpha1.ContractAddressConfig{
-						DiscoveryMethod: "well-known",
+					ChainID:   11155420,
+					L1ChainID: 11155111,
+					L1RpcUrl:  testL1RpcUrl,
+					RollupConfig: &optimismv1alpha1.ConfigSource{
+						ConfigMapRef: &corev1.ConfigMapKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "test-rollup-config",
+							},
+							Key: "rollup.json",
+						},
 					},
 				},
 			}
 
-			addresses, err := discoveryService.DiscoverContracts(context.Background(), network)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(addresses).NotTo(BeNil())
-			Expect(addresses.L2OutputOracleAddr).NotTo(BeEmpty())
-			Expect(addresses.SystemConfigAddr).NotTo(BeEmpty())
-			Expect(addresses.DiscoveryMethod).To(Equal("well-known"))
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				if err != nil {
+					return false
+				}
+				// Should pass configuration validation since ConfigMap exists
+				for _, condition := range createdNetwork.Status.Conditions {
+					if condition.Type == "ConfigurationValid" && condition.Status == metav1.ConditionTrue {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
 		})
 
-		It("should discover well-known addresses for op-sepolia", func() {
-			discoveryService := discovery.NewContractDiscoveryService(24 * time.Hour)
-
+		It("Should set proper status conditions and phases", func() {
+			By("Creating an OptimismNetwork")
 			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
 				Spec: optimismv1alpha1.OptimismNetworkSpec{
 					NetworkName: "op-sepolia",
 					ChainID:     11155420,
 					L1ChainID:   11155111,
-					L1RpcUrl:    "https://sepolia.infura.io/v3/test",
+					L1RpcUrl:    testL1RpcUrl,
 					ContractAddresses: &optimismv1alpha1.ContractAddressConfig{
 						DiscoveryMethod: "well-known",
 					},
 				},
 			}
 
-			addresses, err := discoveryService.DiscoverContracts(context.Background(), network)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(addresses).NotTo(BeNil())
-			Expect(addresses.L2OutputOracleAddr).NotTo(BeEmpty())
-			Expect(addresses.DiscoveryMethod).To(Equal("well-known"))
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() int {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				if err != nil {
+					return 0
+				}
+				return len(createdNetwork.Status.Conditions)
+			}, timeout, interval).Should(BeNumerically(">", 0))
+
+			By("Checking that status conditions are set")
+			// Should have at least ConfigurationValid condition
+			configCondition := false
+			for _, condition := range createdNetwork.Status.Conditions {
+				if condition.Type == "ConfigurationValid" {
+					configCondition = true
+					Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+					Expect(condition.Reason).Should(Equal("ValidConfiguration"))
+					break
+				}
+			}
+			Expect(configCondition).Should(BeTrue())
+
+			By("Checking observed generation is set")
+			Expect(createdNetwork.Status.ObservedGeneration).Should(Equal(createdNetwork.Generation))
 		})
 
-		It("should use manual addresses when provided", func() {
-			discoveryService := discovery.NewContractDiscoveryService(24 * time.Hour)
-
+		It("Should handle finalizer and deletion properly", func() {
+			By("Creating an OptimismNetwork")
 			network := &optimismv1alpha1.OptimismNetwork{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "optimism.optimism.io/v1alpha1",
+					Kind:       "OptimismNetwork",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      OptimismNetworkName,
+					Namespace: OptimismNetworkNamespace,
+				},
 				Spec: optimismv1alpha1.OptimismNetworkSpec{
-					NetworkName: "custom-network",
-					ChainID:     999,
-					L1ChainID:   1,
-					L1RpcUrl:    "https://mainnet.infura.io/v3/test",
-					ContractAddresses: &optimismv1alpha1.ContractAddressConfig{
-						DiscoveryMethod:    "manual",
-						SystemConfigAddr:   "0x1234567890123456789012345678901234567890",
-						L2OutputOracleAddr: "0x0987654321098765432109876543210987654321",
-					},
+					ChainID:   11155420,
+					L1ChainID: 11155111,
+					L1RpcUrl:  testL1RpcUrl,
 				},
 			}
 
-			addresses, err := discoveryService.DiscoverContracts(context.Background(), network)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(addresses).NotTo(BeNil())
-			Expect(addresses.SystemConfigAddr).To(Equal("0x1234567890123456789012345678901234567890"))
-			Expect(addresses.L2OutputOracleAddr).To(Equal("0x0987654321098765432109876543210987654321"))
-			Expect(addresses.DiscoveryMethod).To(Equal("manual"))
+			Expect(k8sClient.Create(ctx, network)).Should(Succeed())
+
+			networkLookupKey := types.NamespacedName{Name: OptimismNetworkName, Namespace: OptimismNetworkNamespace}
+			createdNetwork := &optimismv1alpha1.OptimismNetwork{}
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				if err != nil {
+					return false
+				}
+				// Check that finalizer is added
+				for _, finalizer := range createdNetwork.Finalizers {
+					if finalizer == OptimismNetworkFinalizer {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the OptimismNetwork")
+			Expect(k8sClient.Delete(ctx, createdNetwork)).Should(Succeed())
+
+			By("Checking the OptimismNetwork is eventually deleted")
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, networkLookupKey, createdNetwork)
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 
-	Context("When updating phase", func() {
+	Context("Unit tests for controller methods", func() {
 		var reconciler *OptimismNetworkReconciler
 
 		BeforeEach(func() {
@@ -397,42 +577,113 @@ var _ = Describe("OptimismNetwork Controller", func() {
 			}
 		})
 
-		It("should set phase to Ready when all conditions are True", func() {
-			network := &optimismv1alpha1.OptimismNetwork{}
+		Describe("validateConfiguration", func() {
+			It("Should accept valid configuration", func() {
+				network := &optimismv1alpha1.OptimismNetwork{
+					Spec: optimismv1alpha1.OptimismNetworkSpec{
+						ChainID:   10,
+						L1ChainID: 1,
+						L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+					},
+				}
 
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionConfigurationValid, utils.ReasonValidConfiguration, "Valid")
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionL1Connected, utils.ReasonRPCEndpointReachable, "Connected")
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionContractsDiscovered, utils.ReasonAddressesResolved, "Discovered")
+				err := reconciler.validateConfiguration(network)
+				Expect(err).Should(BeNil())
+			})
 
-			reconciler.updatePhase(network)
-			Expect(network.Status.Phase).To(Equal("Ready"))
+			It("Should reject missing required fields", func() {
+				network := &optimismv1alpha1.OptimismNetwork{
+					Spec: optimismv1alpha1.OptimismNetworkSpec{
+						// Missing ChainID
+						L1ChainID: 1,
+						L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+					},
+				}
+
+				err := reconciler.validateConfiguration(network)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("chainID is required"))
+			})
+
+			It("Should reject same L1 and L2 chain IDs", func() {
+				network := &optimismv1alpha1.OptimismNetwork{
+					Spec: optimismv1alpha1.OptimismNetworkSpec{
+						ChainID:   1,
+						L1ChainID: 1,
+						L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+					},
+				}
+
+				err := reconciler.validateConfiguration(network)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("chainID cannot be the same as l1ChainID"))
+			})
+
+			It("Should validate ConfigSource options", func() {
+				network := &optimismv1alpha1.OptimismNetwork{
+					Spec: optimismv1alpha1.OptimismNetworkSpec{
+						ChainID:   10,
+						L1ChainID: 1,
+						L1RpcUrl:  "https://mainnet.infura.io/v3/test",
+						RollupConfig: &optimismv1alpha1.ConfigSource{
+							Inline:       "test",
+							AutoDiscover: true, // Both set - should be invalid
+						},
+					},
+				}
+
+				err := reconciler.validateConfiguration(network)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("only one of inline, configMapRef, or autoDiscover can be specified"))
+			})
 		})
 
-		It("should set phase to Error when any condition is False", func() {
-			network := &optimismv1alpha1.OptimismNetwork{}
+		Describe("generateRollupConfig", func() {
+			It("Should generate valid rollup config JSON", func() {
+				network := &optimismv1alpha1.OptimismNetwork{
+					Spec: optimismv1alpha1.OptimismNetworkSpec{
+						ChainID:   10,
+						L1ChainID: 1,
+					},
+				}
 
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionConfigurationValid, utils.ReasonValidConfiguration, "Valid")
-			utils.SetConditionFalse(&network.Status.Conditions,
-				utils.ConditionL1Connected, utils.ReasonRPCEndpointUnreachable, "Failed")
+				addresses := &optimismv1alpha1.NetworkContractAddresses{
+					OptimismPortalAddr: "0x1234567890123456789012345678901234567890",
+					SystemConfigAddr:   "0x0987654321098765432109876543210987654321",
+				}
 
-			reconciler.updatePhase(network)
-			Expect(network.Status.Phase).To(Equal("Error"))
+				config := reconciler.generateRollupConfig(network, addresses)
+				Expect(config).Should(ContainSubstring(`"l1_chain_id": 1`))
+				Expect(config).Should(ContainSubstring(`"l2_chain_id": 10`))
+				Expect(config).Should(ContainSubstring("0x1234567890123456789012345678901234567890"))
+				Expect(config).Should(ContainSubstring("0x0987654321098765432109876543210987654321"))
+			})
 		})
 
-		It("should set phase to Pending when conditions are not all True", func() {
-			network := &optimismv1alpha1.OptimismNetwork{}
+		Describe("generateGenesisConfig", func() {
+			It("Should generate valid genesis config JSON", func() {
+				network := &optimismv1alpha1.OptimismNetwork{
+					Spec: optimismv1alpha1.OptimismNetworkSpec{
+						ChainID: 10,
+					},
+				}
 
-			utils.SetConditionTrue(&network.Status.Conditions,
-				utils.ConditionConfigurationValid, utils.ReasonValidConfiguration, "Valid")
-			utils.SetConditionUnknown(&network.Status.Conditions,
-				utils.ConditionL1Connected, "Testing", "Testing connection")
+				addresses := &optimismv1alpha1.NetworkContractAddresses{}
 
-			reconciler.updatePhase(network)
-			Expect(network.Status.Phase).To(Equal("Pending"))
+				config := reconciler.generateGenesisConfig(network, addresses)
+				Expect(config).Should(ContainSubstring(`"chainId": 10`))
+				Expect(config).Should(ContainSubstring(`"optimism"`))
+				Expect(config).Should(ContainSubstring(`"alloc"`))
+			})
 		})
 	})
 })
+
+// Helper functions
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}

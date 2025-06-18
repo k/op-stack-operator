@@ -86,11 +86,6 @@ spec:
               l1ChainID:
                 format: int64
                 type: integer
-              l1RpcKind:
-                description: L1 RPC Configuration
-                type: string
-              l1RpcRateLimit:
-                type: integer
               l1RpcTimeout:
                 description: |-
                   A Duration represents the elapsed time between two instants
@@ -99,7 +94,7 @@ spec:
                 format: int64
                 type: integer
               l1RpcUrl:
-                description: RPC Endpoints
+                description: L1 RPC Configuration (required by all components)
                 type: string
               l2Genesis:
                 description: ConfigSource defines how configuration data is provided
@@ -132,8 +127,6 @@ spec:
                   inline:
                     type: string
                 type: object
-              l2RpcUrl:
-                type: string
               networkName:
                 description: Network Configuration
                 type: string
@@ -336,7 +329,8 @@ spec:
                       l1StandardBridgeAddr:
                         type: string
                       l2CrossDomainMessengerAddr:
-                        description: L2 Contracts (predeploys)
+                        description: L2 Contracts (predeploys - same across all OP
+                          Stack chains)
                         type: string
                       l2OutputOracleAddr:
                         description: L1 Contracts
