@@ -266,12 +266,17 @@ func createOpNodeContainer(
 	}
 
 	// Build command args
+	authRPCPort := getAuthRPCPort(opNode)
 	args := []string{
 		"--l1=" + network.Spec.L1RpcUrl,
-		"--l2=http://127.0.0.1:8551",
+		"--l2=http://127.0.0.1:" + fmt.Sprintf("%d", authRPCPort),
 		"--l2.jwt-secret=/secrets/jwt/jwt",
 		"--rollup.config=/config/rollup.json",
-		"--network=" + network.Spec.NetworkName,
+	}
+
+	// Add network name if provided
+	if network.Spec.NetworkName != "" {
+		args = append(args, "--network="+network.Spec.NetworkName)
 	}
 
 	// Add RPC configuration
@@ -517,4 +522,12 @@ func getSequencerEndpoint(opNode *optimismv1alpha1.OpNode, network *optimismv1al
 	// For replica nodes, construct sequencer service name based on network
 	// This assumes a sequencer OpNode exists with the naming convention: {network-name}-sequencer
 	return fmt.Sprintf("http://%s-sequencer:8545", network.Name)
+}
+
+// getAuthRPCPort returns the configured AuthRPC port for op-geth
+func getAuthRPCPort(opNode *optimismv1alpha1.OpNode) int32 {
+	if opNode.Spec.OpGeth.Networking != nil && opNode.Spec.OpGeth.Networking.AuthRPC != nil {
+		return getDefaultInt32(opNode.Spec.OpGeth.Networking.AuthRPC.Port, 8551)
+	}
+	return 8551
 }
