@@ -431,8 +431,12 @@ func (r *OptimismNetworkReconciler) updateStatusWithRetry(ctx context.Context, n
 			return err
 		}
 
-		// Update the status on the latest version
-		latest.Status = network.Status
+		// Copy individual status fields from network to latest to avoid race conditions
+		latest.Status.Phase = network.Status.Phase
+		latest.Status.ObservedGeneration = network.Status.ObservedGeneration
+		latest.Status.Conditions = network.Status.Conditions
+		latest.Status.NetworkInfo = network.Status.NetworkInfo
+
 		return r.Status().Update(ctx, &latest)
 	})
 }

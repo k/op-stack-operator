@@ -491,8 +491,12 @@ func (r *OpNodeReconciler) updateStatusWithRetry(ctx context.Context, opNode *op
 			return err
 		}
 
-		// Update the status on the latest version
-		latest.Status = opNode.Status
+		// Copy individual status fields from opNode to latest to avoid race conditions
+		latest.Status.Phase = opNode.Status.Phase
+		latest.Status.ObservedGeneration = opNode.Status.ObservedGeneration
+		latest.Status.Conditions = opNode.Status.Conditions
+		latest.Status.NodeInfo = opNode.Status.NodeInfo
+
 		return r.Status().Update(ctx, latest)
 	})
 }
