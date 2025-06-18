@@ -51,7 +51,18 @@ var _ = Describe("OpNode Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: optimismv1alpha1.OpNodeSpec{
+						OptimismNetworkRef: optimismv1alpha1.OptimismNetworkRef{
+							Name: "test-network",
+						},
+						NodeType: "replica",
+						OpNode: optimismv1alpha1.OpNodeConfig{
+							SyncMode: "execution-layer",
+						},
+						OpGeth: optimismv1alpha1.OpGethConfig{
+							DataDir: "/data/geth",
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

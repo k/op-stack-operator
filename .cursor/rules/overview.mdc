@@ -11,7 +11,10 @@ Make sure to verify we are using the latest optimism spec. Feel free to referenc
 
 This repository contains a **Kubernetes Operator** built with **Kubebuilder** to manage the lifecycle of an **OP Stack-based L2 rollup**. The operator introduces a single custom resource (`OPChain`) that declaratively deploys and manages all core components of an OP Stack chain:
 
-
 Development progress should be tracked in @PROGRESS.md
+
+Make sure to lint
+
+Make sure to test new code using the testing setup
 
 Use kind cluster for testing
