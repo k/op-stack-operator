@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/oplabs/opstack-operator/test/utils"
+	"github.com/ethereum-optimism/op-stack-operator/test/utils"
 )
 
 var (

@@ -2,19 +2,55 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: oplabs.io
+domain: optimism.io
 layout:
 - go.kubebuilder.io/v4
 projectName: op-stack-operator
-repo: github.com/oplabs/opstack-operator
+repo: github.com/ethereum-optimism/op-stack-operator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: oplabs.io
-  group: rollup
-  kind: OPChain
-  path: github.com/oplabs/opstack-operator/api/v1alpha1
+  domain: optimism.io
+  group: optimism
+  kind: OptimismNetwork
+  path: github.com/ethereum-optimism/op-stack-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: optimism.io
+  group: optimism
+  kind: OpNode
+  path: github.com/ethereum-optimism/op-stack-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: optimism.io
+  group: optimism
+  kind: OpBatcher
+  path: github.com/ethereum-optimism/op-stack-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: optimism.io
+  group: optimism
+  kind: OpProposer
+  path: github.com/ethereum-optimism/op-stack-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: optimism.io
+  group: optimism
+  kind: OpChallenger
+  path: github.com/ethereum-optimism/op-stack-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

@@ -3,20 +3,15 @@ description:
 globs: 
 alwaysApply: true
 ---
+You are an expert in kubebuilder, kubernetes, operators, and optimism.
+
+Make sure to verify we are using the latest optimism spec. Feel free to reference optimism git code referenced in the workspace.
+
 ## 📦 Project Purpose
 
 This repository contains a **Kubernetes Operator** built with **Kubebuilder** to manage the lifecycle of an **OP Stack-based L2 rollup**. The operator introduces a single custom resource (`OPChain`) that declaratively deploys and manages all core components of an OP Stack chain:
 
-- `op-geth`: execution client
-- `op-node`: rollup coordination
-- `op-batcher`: L2 → L1 transaction data submission
-- `op-proposer`: L2 output root checkpoint submission
-- Optional: `proxyd`, monitoring, signer service
 
-Architecture is defined in [ARCHITECTURE.md](mdc:ARCHITECTURE.md)
-
-Implementation plan is in [IMPLEMENTATION_NOTES.md](mdc:IMPLEMENTATION_NOTES.md)
-
-Development progress is tracked in [PROGRESS.md](mdc:PROGRESS.md)
+Development progress should be tracked in @PROGRESS.md
 
 Use kind cluster for testing

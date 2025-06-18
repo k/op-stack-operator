@@ -49,6 +49,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: generate-all
+generate-all: manifests generate fmt vet ## Generate all code and manifests
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -60,6 +63,14 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+
+.PHONY: test-unit
+test-unit: manifests generate fmt vet setup-envtest ## Run unit tests
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+
+.PHONY: test-integration
+test-integration: manifests generate fmt vet ## Run integration tests
+	go test ./test/integration/... -v
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
@@ -133,6 +144,26 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+##@ Development Tools
+
+.PHONY: kind-load
+kind-load: docker-build ## Load image into kind cluster for testing
+	kind load docker-image ${IMG}
+
+.PHONY: deploy-samples
+deploy-samples: ## Deploy sample configurations
+	kubectl apply -f config/samples/
+
+##@ Examples
+
+.PHONY: examples-basic
+examples-basic: ## Deploy basic example
+	kubectl apply -f examples/basic/
+
+.PHONY: examples-production
+examples-production: ## Deploy production example
+	kubectl apply -f examples/production/
 
 ##@ Deployment
 

@@ -37,8 +37,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	rollupv1alpha1 "github.com/oplabs/opstack-operator/api/v1alpha1"
-	"github.com/oplabs/opstack-operator/internal/controller"
+	optimismv1alpha1 "github.com/ethereum-optimism/op-stack-operator/api/v1alpha1"
+	"github.com/ethereum-optimism/op-stack-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(rollupv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(optimismv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -184,7 +184,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "61e55fda.oplabs.io",
+		LeaderElectionID:       "bd57a1ae.optimism.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -202,11 +202,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.OPChainReconciler{
+	if err = (&controller.OptimismNetworkReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "OPChain")
+		setupLog.Error(err, "unable to create controller", "controller", "OptimismNetwork")
+		os.Exit(1)
+	}
+	if err = (&controller.OpNodeReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OpNode")
+		os.Exit(1)
+	}
+	if err = (&controller.OpBatcherReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OpBatcher")
+		os.Exit(1)
+	}
+	if err = (&controller.OpProposerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OpProposer")
+		os.Exit(1)
+	}
+	if err = (&controller.OpChallengerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OpChallenger")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

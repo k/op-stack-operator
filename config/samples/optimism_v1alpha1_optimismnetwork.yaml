@@ -1,0 +1,9 @@
+apiVersion: optimism.optimism.io/v1alpha1
+kind: OptimismNetwork
+metadata:
+  labels:
+    app.kubernetes.io/name: op-stack-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: optimismnetwork-sample
+spec:
+  # TODO(user): Add fields here

@@ -5,12 +5,13 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
+  - optimism.optimism.io
   resources:
-  - configmaps
-  - persistentvolumeclaims
-  - secrets
-  - services
+  - opbatchers
+  - opchallengers
+  - opnodes
+  - opproposers
+  - optimismnetworks
   verbs:
   - create
   - delete
@@ -20,39 +21,23 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps
+  - optimism.optimism.io
   resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rollup.oplabs.io
-  resources:
-  - opchains
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rollup.oplabs.io
-  resources:
-  - opchains/finalizers
+  - opbatchers/finalizers
+  - opchallengers/finalizers
+  - opnodes/finalizers
+  - opproposers/finalizers
+  - optimismnetworks/finalizers
   verbs:
   - update
 - apiGroups:
-  - rollup.oplabs.io
+  - optimism.optimism.io
   resources:
-  - opchains/status
+  - opbatchers/status
+  - opchallengers/status
+  - opnodes/status
+  - opproposers/status
+  - optimismnetworks/status
   verbs:
   - get
   - patch

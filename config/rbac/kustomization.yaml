@@ -22,7 +22,19 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- opchain_admin_role.yaml
-- opchain_editor_role.yaml
-- opchain_viewer_role.yaml
+- opchallenger_admin_role.yaml
+- opchallenger_editor_role.yaml
+- opchallenger_viewer_role.yaml
+- opproposer_admin_role.yaml
+- opproposer_editor_role.yaml
+- opproposer_viewer_role.yaml
+- opbatcher_admin_role.yaml
+- opbatcher_editor_role.yaml
+- opbatcher_viewer_role.yaml
+- opnode_admin_role.yaml
+- opnode_editor_role.yaml
+- opnode_viewer_role.yaml
+- optimismnetwork_admin_role.yaml
+- optimismnetwork_editor_role.yaml
+- optimismnetwork_viewer_role.yaml
 

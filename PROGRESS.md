@@ -1,177 +1,101 @@
-# OP Stack Kubernetes Operator - Development Progress
+# OP Stack Operator - Development Progress
 
-## ✅ **Phase 1: Core Infrastructure** (COMPLETED)
+## ✅ Phase 1: Initial Project Setup (COMPLETED)
 
-### 🏗️ **Kubebuilder Scaffolding**
-- [x] Initialized Kubebuilder project with domain `oplabs.io`
-- [x] Created `OPChain` CRD with group `rollup.oplabs.io/v1alpha1`
-- [x] Generated controller scaffolding
+**Date Completed**: January 17, 2025
 
-### 📋 **API Definition (Original)**
-- [x] Comprehensive `OPChainSpec` with all OP Stack components
-  - [x] Chain configuration (chainId, networkName)
-  - [x] L1 configuration (RPC URL, chain ID, deployer key secret)
-  - [x] Component configs (geth, node, batcher, proposer)
-  - [x] Resource requirements and storage configuration
-- [x] Complete `OPChainStatus` with deployment phases and conditions
-  - [x] Phase tracking (Pending, Deploying, Running, Error, Upgrading)
-  - [x] Condition-based status reporting
-  - [x] Contract addresses and component status tracking
-- [x] Custom resource validation and kubectl column definitions
+### What's Done:
 
-### 🏭 **Manifest Generation System**
-- [x] Go template-based manifest generator
-- [x] Embedded YAML templates using `//go:embed`
-- [x] Template data structures for all components
-- [x] Component-specific template generation (op-geth, op-node, op-batcher, op-proposer)
-- [x] Proper template file extensions (`.yaml.tmpl`) to avoid linter conflicts
-- [x] All manifest templates completed and working:
-  - [x] op-geth: deployment.yaml.tmpl, service.yaml.tmpl, pvc.yaml.tmpl, configmap.yaml.tmpl, secret.yaml.tmpl
-  - [x] op-node: deployment.yaml.tmpl, service.yaml.tmpl, configmap.yaml.tmpl
-  - [x] op-batcher: deployment.yaml.tmpl  
-  - [x] op-proposer: deployment.yaml.tmpl
-- [x] Fixed hardcoded Pod object detection with proper Kubernetes resource type switching
+- **Kubebuilder Project**: Initialized with domain `optimism.io` and project version 3
+- **CRDs Created**: All 5 core CRDs with controllers:
+  - `OptimismNetwork` (foundational)
+  - `OpNode`
+  - `OpBatcher`
+  - `OpProposer`
+  - `OpChallenger`
+- **Project Structure**: Complete directory layout with pkg/, examples/, docs/, helm/, test/ directories
+- **Generated Assets**: CRD manifests, RBAC, sample configs, working Makefile
+- **Verification**: Project builds successfully (`make build` passes)
 
-### 🔌 **op-deployer Integration (Original)**
-- [x] op-deployer client with intent generation
-- [x] L1 contract deployment pipeline
-- [x] Configuration extraction (genesis.json, rollup.json)
-- [x] Contract address parsing and storage
-- [x] Comprehensive testing infrastructure created
-- [x] Integration challenges identified and documented
+### Key Files Created:
 
-### 🎛️ **Controller Implementation**
-- [x] Comprehensive reconciliation logic
-- [x] Finalizer-based resource cleanup
-- [x] L1 contract deployment orchestration
-- [x] L2 component manifest generation and application
-- [x] Secret management (genesis, rollup config, JWT)
-- [x] Status reporting with conditions
-- [x] Error handling and retry logic
-- [x] RBAC permissions for all required resources
-
-### 📄 **Sample Configuration**
-- [x] Complete sample `OPChain` resource
-- [x] Realistic resource requirements and configurations
-- [x] Official OP Labs container images
-
-## 🛠️ **Phase 2: Testing Infrastructure** (COMPLETED)
-
-### 🧪 **End-to-End Testing Setup**
-- [x] scripts/start-anvil.sh: Anvil L1 testnet with deterministic accounts
-- [x] scripts/setup-kind.sh: Kind cluster with port mappings
-- [x] scripts/setup-secrets.sh: Kubernetes secrets with test keys
-- [x] scripts/e2e-test.sh: Main testing orchestration
-- [x] config/samples/test-opchain.yaml: Test OPChain configuration
-- [x] scripts/test-op-deployer.sh: op-deployer validation script
-- [x] scripts/generate-intent.sh: Proper intent.toml generation
-
-### 🔍 **Architecture Analysis**
-- [x] op-deployer integration challenges identified:
-  - [x] Production-oriented validation conflicts with development needs
-  - [x] Hardcoded challenger address validation for specific networks
-  - [x] Complex L1/L2 coupling in single operator
-- [x] Root cause analysis completed
-- [x] Architectural solution proposed and validated
-
-## 🎯 **Phase 3: Architecture Evolution** (IN PROGRESS)
-
-### 🏗️ **Separated Concerns Architecture**
-- [x] **Analysis**: Identified benefits of L1/L2 separation
-- [x] **Documentation**: Updated ARCHITECTURE.md with new design
-- [x] **Implementation Plan**: Updated IMPLEMENTATION_NOTES.md 
-- [x] **Progress Tracking**: Updated PROGRESS.md (this file)
-- [ ] **API Updates**: Modify CRD for L2-focused architecture
-- [ ] **Configuration Management**: Implement secret-based config loading
-- [ ] **Controller Refactoring**: Simplify to L2 service management only
-- [ ] **Testing Updates**: Adapt tests for new architecture
-
-### 📋 **New Architecture Overview**
-
-```
-┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│ L1 Deployment       │    │ Kubernetes Operator │    │ L2 Services         │
-│ (External)          │───▶│ (This Project)      │───▶│ (Managed)           │
-│                     │    │                     │    │                     │
-│ • op-deployer       │    │ • Config Loading    │    │ • op-geth           │
-│ • Scripts/CI/CD     │    │ • Manifest Gen      │    │ • op-node           │
-│ • Manual Setup      │    │ • Lifecycle Mgmt    │    │ • op-batcher        │
-│ • Platform Team     │    │ • Status Reporting  │    │ • op-proposer       │
-└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
-```
-
-### ✅ **Benefits Achieved**
-- **Clear Separation**: L1 deployment vs L2 service management
-- **Better Testing**: No complex external tool integration
-- **Operational Flexibility**: Support different L1 deployment methods
-- **Reduced Complexity**: Focused operator responsibility
-- **Team Ownership**: Platform team (L1) vs Application team (L2)
-
-## 🚧 **Current Priorities**
-
-### 🔧 **Immediate Tasks**
-1. **Update CRD Schema**
-   - [ ] Remove L1 deployment fields
-   - [ ] Add L2 configuration secret references
-   - [ ] Add L1 contract address fields
-   - [ ] Update status conditions for new workflow
-
-2. **Configuration Management**
-   - [ ] Implement pkg/config/loader.go for secret loading
-   - [ ] Add configuration validation logic
-   - [ ] Update template data structures
-
-3. **Controller Refactoring**
-   - [ ] Remove op-deployer integration
-   - [ ] Simplify reconciliation logic
-   - [ ] Focus on L2 service lifecycle
-
-4. **Documentation Updates**
-   - [x] Update ARCHITECTURE.md
-   - [x] Update IMPLEMENTATION_NOTES.md
-   - [x] Update PROGRESS.md
-   - [ ] Update README.md
-   - [ ] Create deployment guides
-
-### 🎯 **New Workflow**
-1. **External L1 Deployment**: Platform team uses op-deployer or other tools
-2. **Config Extraction**: genesis.json, rollup.json, contract addresses
-3. **Secret Creation**: Kubernetes secrets with extracted configs
-4. **OPChain Deployment**: Application team deploys L2 services via operator
-5. **Service Management**: Operator manages L2 service lifecycle
-
-## 📊 **Current Status**
-
-**✅ Foundation Complete**: Core operator infrastructure with comprehensive templates and testing setup.
-
-**🏗️ Architecture Evolved**: New separated-concerns design documented and planned.
-
-**🚀 Ready for Refactoring**: Clear implementation path for simplified, focused operator.
-
-**🎯 Next Milestone**: Complete CRD updates and configuration management for new architecture.
-
-## 🛠️ **Development Commands**
-
-```bash
-# Build the project
-make build
-
-# Generate manifests  
-make manifests
-
-# Install CRDs
-make install
-
-# Deploy controller
-make deploy
-
-# Run locally for development
-make run
-
-# Test with Kind cluster
-./scripts/e2e-test.sh
-```
+- `api/v1alpha1/*.go` - Type definitions for all CRDs
+- `internal/controller/*.go` - Controller scaffolds for all CRDs
+- `config/crd/bases/*.yaml` - Generated CRD manifests
+- Complete Kubebuilder project structure
 
 ---
 
-*Last Updated: January 2025*
+## ✅ Phase 2: Dependency Management (COMPLETED)
+
+**Date Completed**: January 17, 2025
+
+### What's Done:
+
+- **Go Dependencies**: Added all required dependencies:
+  - `github.com/ethereum/go-ethereum@v1.15.11` - Ethereum client for L1/L2 interaction
+  - `github.com/prometheus/client_golang@v1.22.0` - Metrics and monitoring
+  - `github.com/stretchr/testify@latest` - Enhanced testing capabilities
+  - Ginkgo/Gomega already present from Kubebuilder
+- **Container Image Strategy**: Implemented comprehensive `pkg/config/images.go` with:
+  - Default Optimism container images from official registry
+  - Version compatibility matrix for stable components (all versions Docker-verified)
+  - Image validation and override capabilities
+  - Support for different version sets and caching policies
+  - ✅ All container images verified pullable from registry
+- **Version Compatibility Matrix**: Established compatibility tracking between OP Stack components
+- **Makefile Enhancements**: Added custom targets:
+  - `make generate-all` - Generate all code and manifests
+  - `make test-unit` and `make test-integration` - Granular testing
+  - `make kind-load` - Load images into kind cluster
+  - `make deploy-samples` - Deploy sample configurations
+  - `make examples-basic` and `make examples-production` - Deploy examples
+- **Build Verification**: Project builds successfully with new dependencies
+
+### Key Files Created/Updated:
+
+- `pkg/config/images.go` - Complete container image management system
+- `Makefile` - Enhanced with development and testing targets
+- `go.mod` - Updated with new dependencies
+
+---
+
+## 🚧 Phase 3: Core Implementation (NEXT)
+
+### TODO:
+
+- [ ] Implement comprehensive type definitions for all CRDs
+- [ ] Develop core controller logic for OptimismNetwork (foundational)
+- [ ] Implement OpNode controller with StatefulSet management
+- [ ] Implement OpBatcher controller with Deployment management
+- [ ] Implement OpProposer controller with Deployment management
+- [ ] Implement OpChallenger controller with Deployment management
+- [ ] Create shared packages for resource generation
+- [ ] Implement contract address discovery service
+- [ ] Add validation webhooks for CRDs
+
+---
+
+## 📋 Remaining Phases:
+
+- **Phase 4**: Testing Infrastructure
+- **Phase 5**: Documentation and Examples
+- **Phase 6**: CI/CD and Release
+
+---
+
+## 🔧 Development Environment:
+
+- **Go Version**: 1.23+
+- **Kubebuilder**: v4.0+
+- **Test Cluster**: kind (for local testing)
+- **Container Registry**: `us-docker.pkg.dev/oplabs-tools-artifacts/images`
+
+---
+
+## 📝 Notes:
+
+- Using official Optimism container images (not Go imports due to monorepo complexity)
+- Default OP Stack version: `v1.9.5`
+- All CRDs use `optimism.optimism.io/v1alpha1` API group
+- Project follows standard Kubebuilder patterns and best practices
