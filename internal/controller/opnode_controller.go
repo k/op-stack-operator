@@ -146,6 +146,13 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		} else {
 			utils.SetCondition(&opNode.Status.Conditions, "SecretsReady", metav1.ConditionTrue, "SecretsReconciled", "All required secrets are ready")
 
+			// Update status immediately after secrets are ready
+			opNode.Status.ObservedGeneration = opNode.Generation
+			if err := r.updateStatusWithRetry(ctx, &opNode); err != nil {
+				logger.Error(err, "failed to update status after secrets ready")
+				// Don't fail reconciliation for status update errors, but log them
+			}
+
 			// Reconcile StatefulSet
 			if err := r.reconcileStatefulSet(ctx, &opNode, network); err != nil {
 				utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionFalse, "StatefulSetReconciliationFailed", fmt.Sprintf("Failed to reconcile StatefulSet: %v", err))
@@ -153,6 +160,13 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				needsStatusUpdate = true
 			} else {
 				utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionTrue, "StatefulSetReconciled", "StatefulSet is ready")
+
+				// Update status immediately after StatefulSet is ready
+				opNode.Status.ObservedGeneration = opNode.Generation
+				if err := r.updateStatusWithRetry(ctx, &opNode); err != nil {
+					logger.Error(err, "failed to update status after StatefulSet ready")
+					// Don't fail reconciliation for status update errors, but log them
+				}
 
 				// Reconcile Service
 				if err := r.reconcileService(ctx, &opNode, network); err != nil {
@@ -494,7 +508,11 @@ func (r *OpNodeReconciler) updateStatusWithRetry(ctx context.Context, opNode *op
 		// Copy individual status fields from opNode to latest to avoid race conditions
 		latest.Status.Phase = opNode.Status.Phase
 		latest.Status.ObservedGeneration = opNode.Status.ObservedGeneration
-		latest.Status.Conditions = opNode.Status.Conditions
+
+		// Deep copy conditions to avoid reference issues
+		latest.Status.Conditions = make([]metav1.Condition, len(opNode.Status.Conditions))
+		copy(latest.Status.Conditions, opNode.Status.Conditions)
+
 		latest.Status.NodeInfo = opNode.Status.NodeInfo
 
 		return r.Status().Update(ctx, latest)
