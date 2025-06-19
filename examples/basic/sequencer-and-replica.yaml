@@ -1,0 +1,252 @@
+---
+# OptimismNetwork: Defines the network-level configuration
+apiVersion: optimism.optimism.io/v1alpha1
+kind: OptimismNetwork
+metadata:
+  name: op-sepolia
+  namespace: default
+spec:
+  networkName: "op-sepolia"
+  chainID: 11155420
+  l1ChainID: 11155111
+  
+  # L1 configuration
+  l1RpcUrl: "https://rpc.sepolia.org"
+  l1BeaconUrl: "https://beacon.sepolia.org"
+  l1RpcTimeout: 30s
+  
+  # Network configuration auto-discovery
+  rollupConfig:
+    autoDiscover: true
+  l2Genesis:
+    autoDiscover: true
+  contractAddresses:
+    discoveryMethod: "auto"
+    cacheTimeout: 1h
+  
+  # Shared configuration
+  sharedConfig:
+    logging:
+      level: "info"
+      format: "logfmt"
+    metrics:
+      enabled: true
+      port: 7300
+    security:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+
+---
+# OpNode: Sequencer instance
+apiVersion: optimism.optimism.io/v1alpha1
+kind: OpNode
+metadata:
+  name: op-sepolia-sequencer
+  namespace: default
+spec:
+  optimismNetworkRef:
+    name: op-sepolia
+    namespace: default
+  
+  nodeType: sequencer
+  # No sequencerRef needed - sequencers point to themselves
+  
+  opNode:
+    syncMode: execution-layer
+    
+    # Sequencer-specific P2P config
+    p2p:
+      enabled: true
+      listenPort: 9003
+      discovery:
+        enabled: false  # Sequencers typically disable discovery
+      static: []
+      privateKey:
+        generate: true
+    
+    # Sequencer RPC config
+    rpc:
+      enabled: true
+      host: "0.0.0.0"
+      port: 9545
+      enableAdmin: true  # Sequencers need admin access
+    
+    # Enable sequencer mode
+    sequencer:
+      enabled: true
+      blockTime: "2s"
+      maxTxPerBlock: 1000
+    
+    engine:
+      jwtSecret:
+        generate: true
+  
+  opGeth:
+    network: op-sepolia
+    dataDir: "/data/geth"
+    
+    storage:
+      size: 2Ti  # Sequencers need more storage
+      storageClass: fast-ssd
+    
+    syncMode: snap
+    cache: 8192  # More cache for sequencer
+    
+    networking:
+      http:
+        enabled: true
+        host: "0.0.0.0"
+        port: 8545  # This is what replicas will connect to
+        apis: ["web3", "eth", "net", "debug", "admin"]
+      
+      ws:
+        enabled: true
+        host: "0.0.0.0"
+        port: 8546
+        apis: ["web3", "eth", "net"]
+      
+      authrpc:
+        host: "127.0.0.1"
+        port: 8551
+      
+      p2p:
+        port: 30303
+        maxPeers: 25
+        noDiscovery: true  # Sequencer isolation
+  
+  resources:
+    opNode:
+      requests:
+        cpu: "1000m"
+        memory: "2Gi"
+      limits:
+        cpu: "4000m"
+        memory: "8Gi"
+    
+    opGeth:
+      requests:
+        cpu: "4000m"
+        memory: "16Gi"
+      limits:
+        cpu: "12000m"
+        memory: "64Gi"
+
+---
+# OpNode: Replica instance
+apiVersion: optimism.optimism.io/v1alpha1
+kind: OpNode
+metadata:
+  name: op-sepolia-replica-1
+  namespace: default
+spec:
+  optimismNetworkRef:
+    name: op-sepolia
+    namespace: default
+  
+  nodeType: replica
+  
+  # This is the key change: replica specifies which sequencer to follow
+  sequencerRef:
+    name: op-sepolia-sequencer
+    namespace: default  # Same namespace, so this is optional
+  
+  opNode:
+    syncMode: execution-layer
+    
+    # Replica P2P config
+    p2p:
+      enabled: true
+      listenPort: 9003
+      discovery:
+        enabled: true  # Replicas can use discovery
+        bootnodes:
+          - "enr://..."  # Network bootnodes
+      privateKey:
+        generate: true
+    
+    # Replica RPC config
+    rpc:
+      enabled: true
+      host: "0.0.0.0"
+      port: 9545
+      enableAdmin: false  # Replicas don't need admin
+    
+    # No sequencer config - this is a replica
+    sequencer:
+      enabled: false
+    
+    engine:
+      jwtSecret:
+        generate: true
+  
+  opGeth:
+    network: op-sepolia
+    dataDir: "/data/geth"
+    
+    storage:
+      size: 1Ti  # Replicas need less storage
+      storageClass: standard
+    
+    syncMode: snap
+    cache: 4096
+    
+    networking:
+      http:
+        enabled: true
+        host: "0.0.0.0"
+        port: 8545
+        apis: ["web3", "eth", "net"]  # Limited APIs for replicas
+      
+      ws:
+        enabled: true
+        host: "0.0.0.0"
+        port: 8546
+        apis: ["web3", "eth", "net"]
+      
+      authrpc:
+        host: "127.0.0.1"
+        port: 8551
+      
+      p2p:
+        port: 30303
+        maxPeers: 50
+        noDiscovery: false  # Replicas can discover peers
+  
+  resources:
+    opNode:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+    
+    opGeth:
+      requests:
+        cpu: "2000m"
+        memory: "8Gi"
+      limits:
+        cpu: "8000m"
+        memory: "32Gi"
+
+---
+# OpNode: Cross-namespace replica example
+apiVersion: optimism.optimism.io/v1alpha1
+kind: OpNode
+metadata:
+  name: op-sepolia-replica-remote
+  namespace: remote-namespace
+spec:
+  optimismNetworkRef:
+    name: op-sepolia
+    namespace: default  # Network is in different namespace
+  
+  nodeType: replica
+  
+  # Cross-namespace sequencer reference
+  sequencerRef:
+    name: op-sepolia-sequencer
+    namespace: default  # Explicit namespace required for cross-namespace refs
+  
+  # ... rest of configuration similar to replica-1 

@@ -2,66 +2,60 @@ apiVersion: optimism.optimism.io/v1alpha1
 kind: OptimismNetwork
 metadata:
   labels:
-    app.kubernetes.io/name: optimismnetwork
-    app.kubernetes.io/instance: op-sepolia
-    app.kubernetes.io/part-of: op-stack-operator
+    app.kubernetes.io/name: op-stack-operator
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: op-stack-operator
-  name: op-sepolia
-  namespace: optimism-system
+  name: optimismnetwork-sample
 spec:
-  # Network Configuration
+  # Network configuration
   networkName: "op-sepolia"
   chainID: 11155420
   l1ChainID: 11155111
-
-  # L1 RPC Configuration (required by all components)
-  l1RpcUrl: "https://eth-sepolia.g.alchemy.com/v2/zeFYT4eQdrTCht4MM6BhQFqWzZ81QO8O"
-  l1BeaconUrl: "https://sepolia-beacon.example.com"
-  l1RpcTimeout: "10s"
-
-  # Network-specific Configuration Files
+  
+  # L1 configuration
+  l1RpcUrl: "https://rpc.sepolia.org"
+  l1BeaconUrl: "https://beacon.sepolia.org"
+  l1RpcTimeout: 30s
+  
+  # Rollup configuration
   rollupConfig:
-    autoDiscover: true  # Controller will generate rollup config
-
+    autoDiscover: true
+  
+  # L2 Genesis configuration
   l2Genesis:
-    autoDiscover: true  # Controller will generate genesis config
-
-  # Contract Address Discovery
+    autoDiscover: true
+  
+  # Contract address discovery
   contractAddresses:
-    discoveryMethod: "auto"  # auto, superchain-registry, well-known, manual
-    cacheTimeout: "24h"
-    
-    # Optional: If you know the SystemConfig address, it helps with discovery
-    systemConfigAddr: "0x034edD2A225f7f429A63E0f1D2084B9E0A93b538"
-
-  # Shared Configuration for all components
+    discoveryMethod: "auto"
+    cacheTimeout: 1h
+  
+  # Shared configuration for all components
   sharedConfig:
-    # Logging
+    # Logging configuration
     logging:
       level: "info"
       format: "logfmt"
       color: false
-
-    # Metrics
+    
+    # Metrics configuration
     metrics:
       enabled: true
       port: 7300
       path: "/metrics"
-
-    # Resource Defaults (can be overridden by individual components)
+    
+    # Default resource requirements
     resources:
       requests:
-        cpu: "100m"
-        memory: "256Mi"
+        cpu: "500m"
+        memory: "1Gi"
       limits:
-        cpu: "1000m"
-        memory: "2Gi"
-
-    # Security
+        cpu: "2000m"
+        memory: "4Gi"
+    
+    # Security configuration
     security:
       runAsNonRoot: true
       runAsUser: 1000
       fsGroup: 1000
       seccompProfile:
-        type: "RuntimeDefault"
+        type: RuntimeDefault
