@@ -5,5 +5,81 @@ metadata:
     app.kubernetes.io/name: op-stack-operator
     app.kubernetes.io/managed-by: kustomize
   name: opbatcher-sample
+  namespace: optimism-system
 spec:
-  # TODO(user): Add fields here
+  # Network Reference
+  optimismNetworkRef:
+    name: op-sepolia
+    namespace: optimism-system
+
+  # L2 Sequencer Configuration
+  sequencerRef:
+    name: op-sepolia-sequencer
+    namespace: optimism-system
+
+  # Private Key for L1 Transaction Signing
+  privateKey:
+    secretRef:
+      name: batcher-private-key
+      key: private-key
+
+  # Batching Configuration
+  batching:
+    maxChannelDuration: "10m"
+    subSafetyMargin: 10
+    targetL1TxSize: 120000
+    targetNumFrames: 1
+    approxComprRatio: "0.4"
+
+  # Data Availability Configuration (EIP-4844 blob support)
+  dataAvailability:
+    type: "blobs"
+    maxBlobsPerTx: 6
+
+  # Throttling Configuration
+  throttling:
+    enabled: true
+    maxPendingTx: 10
+    backlogSafetyMargin: 10
+
+  # L1 Transaction Management
+  l1Transaction:
+    feeLimitMultiplier: 5
+    resubmissionTimeout: "48s"
+    numConfirmations: 10
+    safeAbortNonceTooLowCount: 3
+
+  # RPC Configuration
+  rpc:
+    enabled: true
+    host: "127.0.0.1"
+    port: 8548
+    enableAdmin: true
+
+  # Metrics Configuration
+  metrics:
+    enabled: true
+    host: "0.0.0.0"
+    port: 7300
+
+  # Resource Configuration
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+---
+# Example private key secret (use your own key in production)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: batcher-private-key
+  namespace: optimism-system
+type: Opaque
+data:
+  # This is a placeholder - replace with your actual base64-encoded private key
+  # echo -n "YOUR_PRIVATE_KEY_HEX" | base64
+  private-key: "REPLACE_WITH_YOUR_BASE64_ENCODED_PRIVATE_KEY"
