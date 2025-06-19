@@ -14,6 +14,11 @@ spec:
   # Node type: sequencer or replica
   nodeType: replica
   
+  # Sequencer reference (only for replica nodes)
+  sequencerRef:
+    name: "op-sepolia-sequencer"  # Name of the sequencer OpNode
+    # namespace: "default"        # Optional: specify if sequencer is in different namespace
+  
   # op-node configuration
   opNode:
     syncMode: execution-layer

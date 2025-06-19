@@ -497,6 +497,20 @@ spec:
                         type: object
                     type: object
                 type: object
+              sequencerRef:
+                description: SequencerRef references the sequencer OpNode (only for
+                  replica nodes)
+                properties:
+                  name:
+                    description: Name of the sequencer OpNode
+                    type: string
+                  namespace:
+                    description: Namespace of the sequencer OpNode (optional, defaults
+                      to same namespace)
+                    type: string
+                required:
+                - name
+                type: object
               service:
                 description: Service configuration
                 properties:
