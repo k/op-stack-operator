@@ -452,7 +452,7 @@ spec:
   networkName: "op-sepolia"
   chainID: 11155420
   l1ChainID: 11155111
-  l1RpcUrl: "https://eth-sepolia.g.alchemy.com/v2/zeFYT4eQdrTCht4MM6BhQFqWzZ81QO8O"
+  l1RpcUrl: "https://eth-sepolia.g.alchemy.com/v2/<API_KEY>"
   sharedConfig:
     logging:
       level: "info"

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -92,7 +93,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.validateConfiguration(&network); err != nil {
 		utils.SetCondition(&network.Status.Conditions, "ConfigurationValid", metav1.ConditionFalse, "InvalidConfiguration", err.Error())
 		network.Status.Phase = PhaseError
-		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
+		if statusErr := r.updateStatusWithRetry(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
@@ -104,7 +105,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.testL1Connectivity(ctx, &network); err != nil {
 		utils.SetCondition(&network.Status.Conditions, "L1Connected", metav1.ConditionFalse, "L1ConnectionFailed", fmt.Sprintf("Failed to connect to L1: %v", err))
 		network.Status.Phase = PhaseError
-		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
+		if statusErr := r.updateStatusWithRetry(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute * 2}, nil
@@ -117,7 +118,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		utils.SetCondition(&network.Status.Conditions, "ContractsDiscovered", metav1.ConditionFalse, "DiscoveryFailed", fmt.Sprintf("Failed to discover contracts: %v", err))
 		network.Status.Phase = PhaseError
-		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
+		if statusErr := r.updateStatusWithRetry(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
@@ -136,7 +137,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.reconcileConfigMaps(ctx, &network, addresses); err != nil {
 		logger.Error(err, "failed to reconcile ConfigMaps")
 		network.Status.Phase = PhaseError
-		if statusErr := r.Status().Update(ctx, &network); statusErr != nil {
+		if statusErr := r.updateStatusWithRetry(ctx, &network); statusErr != nil {
 			logger.Error(statusErr, "failed to update status")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute * 2}, nil
@@ -146,7 +147,7 @@ func (r *OptimismNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	network.Status.Phase = PhaseReady
 	network.Status.ObservedGeneration = network.Generation
 
-	if err := r.Status().Update(ctx, &network); err != nil {
+	if err := r.updateStatusWithRetry(ctx, &network); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -419,6 +420,25 @@ func (r *OptimismNetworkReconciler) handleDeletion(ctx context.Context, network 
 
 	logger.Info("OptimismNetwork deleted successfully", "name", network.Name)
 	return ctrl.Result{}, nil
+}
+
+// updateStatusWithRetry updates the status with retry logic to handle conflicts
+func (r *OptimismNetworkReconciler) updateStatusWithRetry(ctx context.Context, network *optimismv1alpha1.OptimismNetwork) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Fetch the latest version of the resource
+		var latest optimismv1alpha1.OptimismNetwork
+		if err := r.Get(ctx, types.NamespacedName{Name: network.Name, Namespace: network.Namespace}, &latest); err != nil {
+			return err
+		}
+
+		// Copy individual status fields from network to latest to avoid race conditions
+		latest.Status.Phase = network.Status.Phase
+		latest.Status.ObservedGeneration = network.Status.ObservedGeneration
+		latest.Status.Conditions = network.Status.Conditions
+		latest.Status.NetworkInfo = network.Status.NetworkInfo
+
+		return r.Status().Update(ctx, &latest)
+	})
 }
 
 // SetupWithManager sets up the controller with the Manager.
