@@ -19,6 +19,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,12 +44,19 @@ var _ = Describe("OpNode Integration", func() {
 
 		var OpNodeName string
 		var OptimismNetworkName string
+		var testL1RpcUrl string
 
 		var (
 			ctx = context.Background()
 		)
 
 		BeforeEach(func() {
+			// Load real L1 RPC URL from environment
+			testL1RpcUrl = os.Getenv("TEST_L1_RPC_URL")
+			if testL1RpcUrl == "" {
+				Skip("Skipping OpNode integration tests - no TEST_L1_RPC_URL environment variable set")
+			}
+
 			// Generate unique names for each test to avoid conflicts
 			OpNodeName = fmt.Sprintf("test-opnode-%d", time.Now().UnixNano())
 			OptimismNetworkName = fmt.Sprintf("test-network-%d", time.Now().UnixNano())
@@ -70,7 +78,7 @@ var _ = Describe("OpNode Integration", func() {
 					NetworkName:  "test-sepolia",
 					ChainID:      11155420,
 					L1ChainID:    11155111,
-					L1RpcUrl:     "http://localhost:8545", // Mock for testing
+					L1RpcUrl:     testL1RpcUrl, // use real URL
 					L1BeaconUrl:  "http://localhost:5052",
 					L1RpcTimeout: 10 * time.Second,
 					RollupConfig: &optimismv1alpha1.ConfigSource{

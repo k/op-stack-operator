@@ -522,7 +522,12 @@ func getSequencerEndpoint(opNode *optimismv1alpha1.OpNode, network *optimismv1al
 		return fmt.Sprintf("http://127.0.0.1:%d", port)
 	}
 
-	// For replica nodes, use their sequencer reference
+	// For replica nodes, check if L2RpcUrl is provided (external sequencer)
+	if opNode.Spec.L2RpcUrl != "" {
+		return opNode.Spec.L2RpcUrl
+	}
+
+	// For replica nodes, use their sequencer reference (internal sequencer)
 	if opNode.Spec.SequencerRef != nil {
 		// Use the explicit sequencer reference from the OpNode
 		sequencerServiceName := opNode.Spec.SequencerRef.Name

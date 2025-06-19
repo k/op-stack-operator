@@ -1,0 +1,150 @@
+apiVersion: optimism.optimism.io/v1alpha1
+kind: OpNode
+metadata:
+  labels:
+    app.kubernetes.io/name: op-stack-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: op-sepolia-replica
+  namespace: optimism-system
+spec:
+  # Reference to the OptimismNetwork
+  optimismNetworkRef:
+    name: op-sepolia
+    namespace: optimism-system
+
+  # Node type: replica (not sequencer)
+  nodeType: replica
+
+  # External L2 RPC URL for connecting to Sepolia sequencer
+  # This makes sequencerRef optional for external networks
+  l2RpcUrl: "https://sepolia.optimism.io"
+
+  # op-node configuration
+  opNode:
+    syncMode: execution-layer
+    
+    # P2P configuration for replica nodes (discovery enabled)
+    p2p:
+      enabled: true
+      listenPort: 9003
+      discovery:
+        enabled: true
+        bootnodes:
+          - "enr:-J64QBwRaIb3wBrF0tHOGmWGmAu0s_lZYtR7JzXP2eVGLwUq7iyKyeJyDJ8-wWcq4PY-cASaYqMJx7X_WL5_qwKUrGCGAZGOXTNFgmlkgnY0gmlwhLTNlcqJc2VjcDI1NmsxoQLwQIJn3aAa3xzjgGV1c0mckx9smwLaIvwHYXWnzPRrUYN0Y3CC"
+      peerScoring:
+        enabled: true
+      bandwidthLimit: "10MB"
+      privateKey:
+        generate: true
+
+    # RPC configuration 
+    rpc:
+      enabled: true
+      host: "0.0.0.0"
+      port: 9545
+      enableAdmin: false
+      cors:
+        origins: ["*"]
+        methods: ["GET", "POST"]
+
+    # Engine API configuration
+    engine:
+      jwtSecret:
+        generate: true
+      endpoint: "http://127.0.0.1:8551"
+
+  # op-geth configuration
+  opGeth:
+    network: "op-sepolia"
+    dataDir: "/data/geth"
+    
+    # Storage configuration (adjust size based on needs)
+    storage:
+      size: "100Gi"
+      storageClass: "standard"
+      accessMode: "ReadWriteOnce"
+
+    # Sync configuration
+    syncMode: "snap"
+    gcMode: "full"
+    stateScheme: "path"
+    cache: 4096
+    dbEngine: "pebble"
+
+    # Network configuration
+    networking:
+      http:
+        enabled: true
+        host: "0.0.0.0"
+        port: 8545
+        apis: ["web3", "eth", "net", "debug"]
+        cors:
+          origins: ["*"]
+          methods: ["GET", "POST"]
+
+      ws:
+        enabled: true
+        host: "0.0.0.0"
+        port: 8546
+        apis: ["web3", "eth", "net"]
+        origins: ["*"]
+
+      authrpc:
+        host: "127.0.0.1"
+        port: 8551
+        apis: ["engine", "eth"]
+
+      p2p:
+        port: 30303
+        maxPeers: 50
+        noDiscovery: false
+
+    # Transaction pool configuration
+    txpool:
+      noLocals: true
+      journal: "transactions.rlp"
+      lifetime: "1h"
+      priceBump: 10
+      accountSlots: 16
+      globalSlots: 5120
+      accountQueue: 64
+      globalQueue: 1024
+
+    # Rollup-specific configuration
+    rollup:
+      disableTxPoolGossip: false
+      computePendingBlock: false
+
+  # Resource configuration (adjust based on node requirements)
+  resources:
+    opNode:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+    opGeth:
+      requests:
+        cpu: "1000m"
+        memory: "4Gi"
+      limits:
+        cpu: "4000m"
+        memory: "16Gi"
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    ports:
+      - name: "geth-http"
+        port: 8545
+        targetPort: 8545
+        protocol: "TCP"
+      - name: "geth-ws"
+        port: 8546
+        targetPort: 8546
+        protocol: "TCP"
+      - name: "node-rpc"
+        port: 9545
+        targetPort: 9545
+        protocol: "TCP" 

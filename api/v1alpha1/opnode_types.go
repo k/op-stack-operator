@@ -36,7 +36,13 @@ type OpNodeSpec struct {
 	NodeType string `json:"nodeType"`
 
 	// SequencerRef references the sequencer OpNode (only for replica nodes)
+	// This field is optional when L2RpcUrl is set for external sequencer connections
 	SequencerRef *SequencerReference `json:"sequencerRef,omitempty"`
+
+	// L2RpcUrl is the external L2 RPC URL for connecting to an external sequencer
+	// This is typically used for replica nodes connecting to external networks (e.g., Sepolia)
+	// When set, SequencerRef is optional
+	L2RpcUrl string `json:"l2RpcUrl,omitempty"`
 
 	// OpNode configuration
 	OpNode OpNodeConfig `json:"opNode,omitempty"`
