@@ -223,20 +223,34 @@ func createOpGethContainer(
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.FromInt(8545),
+					HTTPHeaders: []corev1.HTTPHeader{
+						{
+							Name:  "Content-Type",
+							Value: "application/json",
+						},
+					},
 				},
 			},
 			InitialDelaySeconds: 60,
 			PeriodSeconds:       30,
+			FailureThreshold:    3,
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/",
 					Port: intstr.FromInt(8545),
+					HTTPHeaders: []corev1.HTTPHeader{
+						{
+							Name:  "Content-Type",
+							Value: "application/json",
+						},
+					},
 				},
 			},
 			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
+			FailureThreshold:    3,
 		},
 	}
 
@@ -376,6 +390,8 @@ func createOpNodeContainer(
 			},
 			InitialDelaySeconds: 60,
 			PeriodSeconds:       30,
+			FailureThreshold:    5,
+			TimeoutSeconds:      10,
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -386,6 +402,8 @@ func createOpNodeContainer(
 			},
 			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
+			FailureThreshold:    3,
+			TimeoutSeconds:      5,
 		},
 	}
 
