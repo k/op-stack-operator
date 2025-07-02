@@ -512,16 +512,56 @@ func joinStrings(strs []string) string {
 	return result
 }
 
+// getSequencerEndpoint returns the configured sequencer endpoint for op-geth
 func getSequencerEndpoint(opNode *optimismv1alpha1.OpNode, network *optimismv1alpha1.OptimismNetwork) string {
 	// If this node is a sequencer, point to itself (localhost)
 	if opNode.Spec.OpNode.Sequencer != nil && opNode.Spec.OpNode.Sequencer.Enabled {
 		// Use localhost since op-geth and op-node run in the same pod
-		return "http://127.0.0.1:8545"
+		// Get the configured HTTP port for this sequencer
+		port := getOpGethHTTPPort(opNode)
+		return fmt.Sprintf("http://127.0.0.1:%d", port)
 	}
 
-	// For replica nodes, construct sequencer service name based on network
-	// This assumes a sequencer OpNode exists with the naming convention: {network-name}-sequencer
-	return fmt.Sprintf("http://%s-sequencer:8545", network.Name)
+	// For replica nodes, check if L2RpcUrl is provided (external sequencer)
+	if opNode.Spec.L2RpcUrl != "" {
+		return opNode.Spec.L2RpcUrl
+	}
+
+	// For replica nodes, use their sequencer reference (internal sequencer)
+	if opNode.Spec.SequencerRef != nil {
+		// Use the explicit sequencer reference from the OpNode
+		sequencerServiceName := opNode.Spec.SequencerRef.Name
+
+		// For cross-namespace references, include the namespace
+		if opNode.Spec.SequencerRef.Namespace != "" &&
+			opNode.Spec.SequencerRef.Namespace != opNode.Namespace {
+			sequencerServiceName = fmt.Sprintf("%s.%s.svc.cluster.local",
+				opNode.Spec.SequencerRef.Name,
+				opNode.Spec.SequencerRef.Namespace)
+		}
+
+		// Use default port since we can't access the sequencer's configuration
+		// In a future enhancement, we could look up the sequencer OpNode to get its configured port
+		port := int32(8545) // Default HTTP port
+
+		return fmt.Sprintf("http://%s:%d", sequencerServiceName, port)
+	}
+
+	// Fallback: use the naming convention for backward compatibility
+	// This maintains compatibility but should be considered deprecated
+	sequencerServiceName := fmt.Sprintf("%s-sequencer", network.Name)
+	port := int32(8545) // Default port assumption
+
+	return fmt.Sprintf("http://%s:%d", sequencerServiceName, port)
+}
+
+// getOpGethHTTPPort returns the configured HTTP port for op-geth
+func getOpGethHTTPPort(opNode *optimismv1alpha1.OpNode) int32 {
+	if opNode.Spec.OpGeth.Networking != nil &&
+		opNode.Spec.OpGeth.Networking.HTTP != nil {
+		return getDefaultInt32(opNode.Spec.OpGeth.Networking.HTTP.Port, 8545)
+	}
+	return 8545
 }
 
 // getAuthRPCPort returns the configured AuthRPC port for op-geth

@@ -2,6 +2,7 @@
 resources:
 - optimism_v1alpha1_optimismnetwork.yaml
 - optimism_v1alpha1_opnode.yaml
+- optimism_v1alpha1_opnode_sepolia_replica.yaml
 - optimism_v1alpha1_opbatcher.yaml
 - optimism_v1alpha1_opproposer.yaml
 - optimism_v1alpha1_opchallenger.yaml

@@ -279,6 +279,11 @@ spec:
   # Node Type
   nodeType: "sequencer" # sequencer, replica
 
+  # Sequencer Reference (only for replica nodes)
+  sequencerRef:
+    name: "op-mainnet-sequencer" # Name of the sequencer OpNode
+    namespace: "optimism-system" # Optional, defaults to same namespace
+
   # op-node Configuration
   opNode:
     # Sync Configuration

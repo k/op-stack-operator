@@ -55,6 +55,12 @@ spec:
           spec:
             description: OpNodeSpec defines the desired state of OpNode
             properties:
+              l2RpcUrl:
+                description: |-
+                  L2RpcUrl is the external L2 RPC URL for connecting to an external sequencer
+                  This is typically used for replica nodes connecting to external networks (e.g., Sepolia)
+                  When set, SequencerRef is optional
+                type: string
               nodeType:
                 description: NodeType specifies whether this is a sequencer or replica
                   node
@@ -496,6 +502,21 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                type: object
+              sequencerRef:
+                description: |-
+                  SequencerRef references the sequencer OpNode (only for replica nodes)
+                  This field is optional when L2RpcUrl is set for external sequencer connections
+                properties:
+                  name:
+                    description: Name of the sequencer OpNode
+                    type: string
+                  namespace:
+                    description: Namespace of the sequencer OpNode (optional, defaults
+                      to same namespace)
+                    type: string
+                required:
+                - name
                 type: object
               service:
                 description: Service configuration

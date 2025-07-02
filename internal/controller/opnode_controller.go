@@ -122,84 +122,56 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	utils.SetCondition(&opNode.Status.Conditions, "NetworkReference", metav1.ConditionTrue, "NetworkFound", "OptimismNetwork reference resolved successfully")
 
-	// Track if we need to update status
-	needsStatusUpdate := false
-
-	// Ensure OptimismNetwork is ready
+	// All core resources are reconciled once the network is ready
 	if network.Status.Phase != PhaseReady {
+		// Network not yet ready: update status and requeue
 		utils.SetCondition(&opNode.Status.Conditions, "NetworkReady", metav1.ConditionFalse, "NetworkNotReady", "OptimismNetwork is not ready")
 		opNode.Status.Phase = OpNodePhasePending
-		needsStatusUpdate = true
-	} else {
-		utils.SetCondition(&opNode.Status.Conditions, "NetworkReady", metav1.ConditionTrue, "NetworkReady", "OptimismNetwork is ready")
-
-		// Update phase to initializing
-		if opNode.Status.Phase != OpNodePhaseRunning {
-			opNode.Status.Phase = OpNodePhaseInitializing
-		}
-
-		// Reconcile secrets (JWT, P2P keys)
-		if err := r.reconcileSecrets(ctx, &opNode); err != nil {
-			utils.SetCondition(&opNode.Status.Conditions, "SecretsReady", metav1.ConditionFalse, "SecretReconciliationFailed", fmt.Sprintf("Failed to reconcile secrets: %v", err))
-			opNode.Status.Phase = OpNodePhaseError
-			needsStatusUpdate = true
-		} else {
-			utils.SetCondition(&opNode.Status.Conditions, "SecretsReady", metav1.ConditionTrue, "SecretsReconciled", "All required secrets are ready")
-
-			// Update status immediately after secrets are ready
-			opNode.Status.ObservedGeneration = opNode.Generation
-			if err := r.updateStatusWithRetry(ctx, &opNode); err != nil {
-				logger.Error(err, "failed to update status after secrets ready")
-				// Don't fail reconciliation for status update errors, but log them
-			}
-
-			// Reconcile StatefulSet
-			if err := r.reconcileStatefulSet(ctx, &opNode, network); err != nil {
-				utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionFalse, "StatefulSetReconciliationFailed", fmt.Sprintf("Failed to reconcile StatefulSet: %v", err))
-				opNode.Status.Phase = OpNodePhaseError
-				needsStatusUpdate = true
-			} else {
-				utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionTrue, "StatefulSetReconciled", "StatefulSet is ready")
-
-				// Update status immediately after StatefulSet is ready
-				opNode.Status.ObservedGeneration = opNode.Generation
-				if err := r.updateStatusWithRetry(ctx, &opNode); err != nil {
-					logger.Error(err, "failed to update status after StatefulSet ready")
-					// Don't fail reconciliation for status update errors, but log them
-				}
-
-				// Reconcile Service
-				if err := r.reconcileService(ctx, &opNode, network); err != nil {
-					utils.SetCondition(&opNode.Status.Conditions, "ServiceReady", metav1.ConditionFalse, "ServiceReconciliationFailed", fmt.Sprintf("Failed to reconcile Service: %v", err))
-					opNode.Status.Phase = OpNodePhaseError
-					needsStatusUpdate = true
-				} else {
-					utils.SetCondition(&opNode.Status.Conditions, "ServiceReady", metav1.ConditionTrue, "ServiceReconciled", "Service is ready")
-
-					// Update node status (don't fail reconciliation for status update errors)
-					r.updateNodeStatus(ctx, &opNode)
-
-					// Update final status
-					opNode.Status.Phase = OpNodePhaseRunning
-					needsStatusUpdate = true
-				}
-			}
-		}
-	}
-
-	// Update observed generation
-	opNode.Status.ObservedGeneration = opNode.Generation
-
-	// Perform single status update at the end with retry logic
-	if needsStatusUpdate {
+		opNode.Status.ObservedGeneration = opNode.Generation
 		if err := r.updateStatusWithRetry(ctx, &opNode); err != nil {
-			logger.Error(err, "failed to update status after retries")
-			// Return error to trigger retry with backoff
-			return ctrl.Result{RequeueAfter: time.Second * 30}, err
+			logger.Error(err, "failed to update status for network pending")
 		}
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
+	// Network is ready
+	utils.SetCondition(&opNode.Status.Conditions, "NetworkReady", metav1.ConditionTrue, "NetworkReady", "OptimismNetwork is ready")
+	opNode.Status.Phase = OpNodePhaseInitializing
 
-	// Determine appropriate requeue interval based on phase
+	// 1) Reconcile secrets
+	if err := r.reconcileSecrets(ctx, &opNode); err != nil {
+		utils.SetCondition(&opNode.Status.Conditions, "SecretsReady", metav1.ConditionFalse, "SecretReconciliationFailed", fmt.Sprintf("Failed to reconcile secrets: %v", err))
+		opNode.Status.Phase = OpNodePhaseError
+		goto updateStatus
+	}
+	utils.SetCondition(&opNode.Status.Conditions, "SecretsReady", metav1.ConditionTrue, "SecretsReconciled", "All required secrets are ready")
+
+	// 2) Reconcile StatefulSet
+	if err := r.reconcileStatefulSet(ctx, &opNode, network); err != nil {
+		utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionFalse, "StatefulSetReconciliationFailed", fmt.Sprintf("Failed to reconcile StatefulSet: %v", err))
+		opNode.Status.Phase = OpNodePhaseError
+		goto updateStatus
+	}
+	utils.SetCondition(&opNode.Status.Conditions, "StatefulSetReady", metav1.ConditionTrue, "StatefulSetReconciled", "StatefulSet is ready")
+
+	// 3) Reconcile Service
+	if err := r.reconcileService(ctx, &opNode, network); err != nil {
+		utils.SetCondition(&opNode.Status.Conditions, "ServiceReady", metav1.ConditionFalse, "ServiceReconciliationFailed", fmt.Sprintf("Failed to reconcile Service: %v", err))
+		opNode.Status.Phase = OpNodePhaseError
+		goto updateStatus
+	}
+	utils.SetCondition(&opNode.Status.Conditions, "ServiceReady", metav1.ConditionTrue, "ServiceReconciled", "Service is ready")
+
+	// 4) All done
+	r.updateNodeStatus(ctx, &opNode)
+	opNode.Status.Phase = OpNodePhaseRunning
+
+updateStatus:
+	// Consolidated status update
+	opNode.Status.ObservedGeneration = opNode.Generation
+	if err := r.updateStatusWithRetry(ctx, &opNode); err != nil {
+		logger.Error(err, "failed to update status")
+	}
+	// Decide requeue interval
 	var requeueAfter time.Duration
 	switch opNode.Status.Phase {
 	case OpNodePhaseError:
@@ -207,16 +179,10 @@ func (r *OpNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	case OpNodePhasePending, OpNodePhaseInitializing:
 		requeueAfter = time.Minute
 	case OpNodePhaseRunning:
-		requeueAfter = time.Minute * 5 // Regular status updates
+		requeueAfter = time.Minute * 5
 	default:
 		requeueAfter = time.Minute
 	}
-
-	if opNode.Status.Phase != OpNodePhaseRunning {
-		return ctrl.Result{RequeueAfter: requeueAfter}, nil
-	}
-
-	logger.Info("OpNode reconciled successfully", "name", opNode.Name, "phase", opNode.Status.Phase, "nodeType", opNode.Spec.NodeType)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
@@ -244,6 +210,11 @@ func (r *OpNodeReconciler) validateConfiguration(opNode *optimismv1alpha1.OpNode
 		// Sequencers should have discovery disabled for isolation
 		if opNode.Spec.OpNode.P2P != nil && opNode.Spec.OpNode.P2P.Discovery != nil && opNode.Spec.OpNode.P2P.Discovery.Enabled {
 			return fmt.Errorf("sequencer nodes should have P2P discovery disabled for security")
+		}
+
+		// Sequencers should not have L2RpcUrl set
+		if opNode.Spec.L2RpcUrl != "" {
+			return fmt.Errorf("sequencer nodes should not have L2RpcUrl set")
 		}
 	}
 
