@@ -223,7 +223,7 @@ func (r *OptimismNetworkReconciler) testL1Connectivity(ctx context.Context, netw
 	if err != nil {
 		return fmt.Errorf("failed to connect to L1 RPC: %w", err)
 	}
-	
+
 	// Ensure client is always closed, even on early returns
 	defer func() {
 		if client != nil {
@@ -235,7 +235,7 @@ func (r *OptimismNetworkReconciler) testL1Connectivity(ctx context.Context, netw
 	// Use a shorter timeout for the actual RPC call
 	callCtx, callCancel := context.WithTimeout(ctx, timeout/2)
 	defer callCancel()
-	
+
 	chainID, err := client.ChainID(callCtx)
 	if err != nil {
 		return fmt.Errorf("failed to get L1 chain ID: %w", err)

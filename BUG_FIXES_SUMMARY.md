@@ -151,6 +151,34 @@ Enhanced probe configurations with:
 - Appropriate timeout values
 - Better HTTP headers for JSON-RPC services
 
+---
+
+## Linter Fixes
+
+**Location**: `internal/controller/opnode_controller.go` and `internal/controller/optimismnetwork_controller.go`
+**Severity**: Low
+**Type**: Code Quality/Formatting
+
+### Description
+Fixed gofmt formatting issues identified by golangci-lint:
+1. Proper indentation for multi-line conditionals in URL validation
+2. Consistent whitespace formatting in blank lines
+
+### Code Changes
+```go
+// Before (improper indentation)
+if len(opNode.Spec.L2RpcUrl) < 7 || 
+    (!strings.HasPrefix(opNode.Spec.L2RpcUrl, "http://") && 
+     !strings.HasPrefix(opNode.Spec.L2RpcUrl, "https://")) {
+
+// After (proper indentation)
+if len(opNode.Spec.L2RpcUrl) < 7 ||
+    (!strings.HasPrefix(opNode.Spec.L2RpcUrl, "http://") &&
+        !strings.HasPrefix(opNode.Spec.L2RpcUrl, "https://")) {
+```
+
+---
+
 ## Summary
 
 These fixes address critical issues in:
@@ -158,5 +186,6 @@ These fixes address critical issues in:
 2. **Logic correctness** - Aligning validation with actual usage patterns  
 3. **Resource management** - Preventing connection leaks
 4. **Reliability** - Improving health check configurations
+5. **Code quality** - Ensuring consistent formatting and linting compliance
 
-All changes maintain backward compatibility while improving the robustness and reliability of the operator.
+All changes maintain backward compatibility while improving the robustness and reliability of the operator. The codebase now passes all linting checks and maintains high code quality standards.

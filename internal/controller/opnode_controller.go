@@ -218,9 +218,9 @@ func (r *OpNodeReconciler) validateConfiguration(opNode *optimismv1alpha1.OpNode
 		// and not the primary sequencer, so we allow it but validate it's a valid URL
 		if opNode.Spec.L2RpcUrl != "" {
 			// Basic URL validation - ensure it starts with http/https
-			if len(opNode.Spec.L2RpcUrl) < 7 || 
-				(!strings.HasPrefix(opNode.Spec.L2RpcUrl, "http://") && 
-				 !strings.HasPrefix(opNode.Spec.L2RpcUrl, "https://")) {
+			if len(opNode.Spec.L2RpcUrl) < 7 ||
+				(!strings.HasPrefix(opNode.Spec.L2RpcUrl, "http://") &&
+					!strings.HasPrefix(opNode.Spec.L2RpcUrl, "https://")) {
 				return fmt.Errorf("L2RpcUrl must be a valid HTTP/HTTPS URL")
 			}
 		}
