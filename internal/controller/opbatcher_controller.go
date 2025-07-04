@@ -42,6 +42,11 @@ import (
 // OpBatcherFinalizer is the finalizer for OpBatcher resources
 const OpBatcherFinalizer = "opbatcher.optimism.io/finalizer"
 
+// Node type constants
+const (
+	NodeTypeSequencer = "sequencer"
+)
+
 // Phase constants for OpBatcher status
 const (
 	OpBatcherPhasePending = "Pending"
@@ -141,7 +146,7 @@ func (r *OpBatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			goto updateStatus
 		}
 		// Check if sequencer is running and is actually a sequencer
-		if sequencer.Spec.NodeType != "sequencer" {
+		if sequencer.Spec.NodeType != NodeTypeSequencer {
 			utils.SetCondition(&opBatcher.Status.Conditions, "SequencerReference", metav1.ConditionFalse, "InvalidSequencer", "Referenced OpNode is not a sequencer")
 			opBatcher.Status.Phase = OpBatcherPhaseError
 			goto updateStatus
@@ -340,7 +345,7 @@ func (r *OpBatcherReconciler) validatePrivateKeySecret(ctx context.Context, opBa
 }
 
 // testL1Connectivity tests connectivity to L1 RPC endpoint
-func (r *OpBatcherReconciler) testL1Connectivity(ctx context.Context, network *optimismv1alpha1.OptimismNetwork) error {
+func (r *OpBatcherReconciler) testL1Connectivity(_ context.Context, network *optimismv1alpha1.OptimismNetwork) error {
 	// For now, we'll do a basic validation that the URL is set and looks valid
 	// In a full implementation, this would make an actual RPC call
 	if network.Spec.L1RpcUrl == "" {
@@ -355,7 +360,7 @@ func (r *OpBatcherReconciler) testL1Connectivity(ctx context.Context, network *o
 }
 
 // testL2Connectivity tests connectivity to L2 sequencer
-func (r *OpBatcherReconciler) testL2Connectivity(ctx context.Context, opBatcher *optimismv1alpha1.OpBatcher, sequencerServiceName string) error {
+func (r *OpBatcherReconciler) testL2Connectivity(_ context.Context, _ *optimismv1alpha1.OpBatcher, sequencerServiceName string) error {
 	// For now, we'll do a basic validation that the service name is set
 	// In a full implementation, this would make an actual RPC call to the sequencer
 	if sequencerServiceName == "" {

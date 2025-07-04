@@ -15,7 +15,11 @@ import (
 )
 
 // CreateOpBatcherDeployment creates a Deployment for an OpBatcher instance
-func CreateOpBatcherDeployment(opBatcher *optimismv1alpha1.OpBatcher, network *optimismv1alpha1.OptimismNetwork, sequencerServiceName string) *appsv1.Deployment {
+func CreateOpBatcherDeployment(
+	opBatcher *optimismv1alpha1.OpBatcher,
+	network *optimismv1alpha1.OptimismNetwork,
+	sequencerServiceName string,
+) *appsv1.Deployment {
 	labels := map[string]string{
 		"app.kubernetes.io/name":       "opbatcher",
 		"app.kubernetes.io/instance":   opBatcher.Name,
@@ -148,7 +152,11 @@ func CreateOpBatcherDeployment(opBatcher *optimismv1alpha1.OpBatcher, network *o
 }
 
 // buildOpBatcherArgs builds command line arguments for op-batcher
-func buildOpBatcherArgs(opBatcher *optimismv1alpha1.OpBatcher, network *optimismv1alpha1.OptimismNetwork, sequencerServiceName string) []string {
+func buildOpBatcherArgs(
+	opBatcher *optimismv1alpha1.OpBatcher,
+	network *optimismv1alpha1.OptimismNetwork,
+	sequencerServiceName string,
+) []string {
 	args := []string{}
 
 	// L1 RPC configuration from OptimismNetwork
@@ -255,7 +263,10 @@ func buildOpBatcherArgs(opBatcher *optimismv1alpha1.OpBatcher, network *optimism
 }
 
 // buildOpBatcherEnvVars builds environment variables for op-batcher
-func buildOpBatcherEnvVars(opBatcher *optimismv1alpha1.OpBatcher, network *optimismv1alpha1.OptimismNetwork) []corev1.EnvVar {
+func buildOpBatcherEnvVars(
+	_ *optimismv1alpha1.OpBatcher,
+	_ *optimismv1alpha1.OptimismNetwork,
+) []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name: "POD_NAME",
