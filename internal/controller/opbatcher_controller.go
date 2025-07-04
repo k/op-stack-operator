@@ -124,7 +124,7 @@ func (r *OpBatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	utils.SetCondition(&opBatcher.Status.Conditions, "NetworkReference", metav1.ConditionTrue, "NetworkFound", "OptimismNetwork reference resolved successfully")
 
 	// Ensure OptimismNetwork is ready
-	if network.Status.Phase != PhaseReady {
+	if network.Status.Phase != "Ready" {
 		utils.SetCondition(&opBatcher.Status.Conditions, "NetworkReady", metav1.ConditionFalse, "NetworkNotReady", "OptimismNetwork is not ready")
 		opBatcher.Status.Phase = OpBatcherPhasePending
 		opBatcher.Status.ObservedGeneration = opBatcher.Generation
@@ -151,7 +151,7 @@ func (r *OpBatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			opBatcher.Status.Phase = OpBatcherPhaseError
 			goto updateStatus
 		}
-		if sequencer.Status.Phase != OpNodePhaseRunning {
+		if sequencer.Status.Phase != "Running" {
 			utils.SetCondition(&opBatcher.Status.Conditions, "SequencerReference", metav1.ConditionFalse, "SequencerNotReady", "Referenced sequencer OpNode is not ready")
 			opBatcher.Status.Phase = OpBatcherPhasePending
 			goto updateStatus

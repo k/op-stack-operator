@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,34 +41,25 @@ const (
 
 var _ = Describe("OpBatcher Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-opbatcher"
-		const networkName = "test-network"
-		const sequencerName = "test-sequencer"
+		var (
+			resourceName  string
+			networkName   string
+			sequencerName string
+			secretName    string
+		)
 
 		ctx := context.Background()
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default",
-		}
-
-		networkNamespacedName := types.NamespacedName{
-			Name:      networkName,
-			Namespace: "default",
-		}
-
-		sequencerNamespacedName := types.NamespacedName{
-			Name:      sequencerName,
-			Namespace: "default",
-		}
-
-		opbatcher := &optimismv1alpha1.OpBatcher{}
-		network := &optimismv1alpha1.OptimismNetwork{}
-		sequencer := &optimismv1alpha1.OpNode{}
-
 		BeforeEach(func() {
+			// Use unique names for each test to avoid conflicts
+			uniqueID := time.Now().UnixNano()
+			resourceName = fmt.Sprintf("test-opbatcher-%d", uniqueID)
+			networkName = fmt.Sprintf("test-network-%d", uniqueID)
+			sequencerName = fmt.Sprintf("test-sequencer-%d", uniqueID)
+			secretName = fmt.Sprintf("batcher-private-key-%d", uniqueID)
+
 			By("Creating the OptimismNetwork")
-			network = &optimismv1alpha1.OptimismNetwork{
+			network := &optimismv1alpha1.OptimismNetwork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      networkName,
 					Namespace: "default",
@@ -117,8 +109,21 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
+			// Register cleanup for network
+			DeferCleanup(func() {
+				networkToDelete := &optimismv1alpha1.OptimismNetwork{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: networkName, Namespace: "default"}, networkToDelete)
+				if err == nil {
+					Expect(k8sClient.Delete(ctx, networkToDelete)).To(Succeed())
+					Eventually(func() bool {
+						err := k8sClient.Get(ctx, types.NamespacedName{Name: networkName, Namespace: "default"}, networkToDelete)
+						return apierrors.IsNotFound(err)
+					}, timeout, interval).Should(BeTrue())
+				}
+			})
+
 			By("Creating the sequencer OpNode")
-			sequencer = &optimismv1alpha1.OpNode{
+			sequencer := &optimismv1alpha1.OpNode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      sequencerName,
 					Namespace: "default",
@@ -135,7 +140,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					},
 				},
 				Status: optimismv1alpha1.OpNodeStatus{
-					Phase: OpNodePhaseRunning,
+					Phase: "Running",
 					Conditions: []metav1.Condition{
 						{
 							Type:   "ConfigurationValid",
@@ -147,10 +152,23 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, sequencer)).To(Succeed())
 
+			// Register cleanup for sequencer
+			DeferCleanup(func() {
+				sequencerToDelete := &optimismv1alpha1.OpNode{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: sequencerName, Namespace: "default"}, sequencerToDelete)
+				if err == nil {
+					Expect(k8sClient.Delete(ctx, sequencerToDelete)).To(Succeed())
+					Eventually(func() bool {
+						err := k8sClient.Get(ctx, types.NamespacedName{Name: sequencerName, Namespace: "default"}, sequencerToDelete)
+						return apierrors.IsNotFound(err)
+					}, timeout, interval).Should(BeTrue())
+				}
+			})
+
 			By("Creating the private key secret")
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "batcher-private-key",
+					Name:      secretName,
 					Namespace: "default",
 				},
 				Data: map[string][]byte{
@@ -158,36 +176,24 @@ var _ = Describe("OpBatcher Controller", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
-		})
 
-		AfterEach(func() {
-			// Clean up resources
-			resource := &optimismv1alpha1.OpBatcher{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			if err == nil {
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-			}
-
-			err = k8sClient.Get(ctx, sequencerNamespacedName, sequencer)
-			if err == nil {
-				Expect(k8sClient.Delete(ctx, sequencer)).To(Succeed())
-			}
-
-			err = k8sClient.Get(ctx, networkNamespacedName, network)
-			if err == nil {
-				Expect(k8sClient.Delete(ctx, network)).To(Succeed())
-			}
-
-			secret := &corev1.Secret{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: "batcher-private-key", Namespace: "default"}, secret)
-			if err == nil {
-				Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
-			}
+			// Register cleanup for secret
+			DeferCleanup(func() {
+				secretToDelete := &corev1.Secret{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "default"}, secretToDelete)
+				if err == nil {
+					Expect(k8sClient.Delete(ctx, secretToDelete)).To(Succeed())
+					Eventually(func() bool {
+						err := k8sClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "default"}, secretToDelete)
+						return apierrors.IsNotFound(err)
+					}, timeout, interval).Should(BeTrue())
+				}
+			})
 		})
 
 		It("should successfully reconcile the resource", func() {
 			By("Creating a new OpBatcher")
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -202,7 +208,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					PrivateKey: optimismv1alpha1.SecretKeyRef{
 						SecretRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "batcher-private-key",
+								Name: secretName,
 							},
 							Key: "private-key",
 						},
@@ -232,30 +238,61 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, opbatcher)).To(Succeed())
 
-			By("Reconciling the created resource")
+			// Register cleanup for OpBatcher
+			DeferCleanup(func() {
+				opbatcherToDelete := &optimismv1alpha1.OpBatcher{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: "default"}, opbatcherToDelete)
+				if err == nil {
+					Expect(k8sClient.Delete(ctx, opbatcherToDelete)).To(Succeed())
+					Eventually(func() bool {
+						err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName, Namespace: "default"}, opbatcherToDelete)
+						return apierrors.IsNotFound(err)
+					}, timeout, interval).Should(BeTrue())
+				}
+			})
+
+			By("Reconciling the created resource twice (finalizer, then logic)")
 			controllerReconciler := &OpBatcherReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
 
+			// First reconcile - adds finalizer
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Second reconcile - actual logic
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that OpBatcher was updated with proper conditions")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, opbatcher)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, opbatcher)
 			}, timeout, interval).Should(Succeed())
 
-			// Should have configuration valid condition
+			// Should have configuration valid condition and network reference condition
 			Expect(opbatcher.Status.Conditions).To(ContainElement(HaveField("Type", "ConfigurationValid")))
 			Expect(opbatcher.Status.Conditions).To(ContainElement(HaveField("Type", "NetworkReference")))
+			// Since the OptimismNetwork won't be ready in tests, we expect it to be pending
+			Expect(opbatcher.Status.Phase).To(Equal(OpBatcherPhasePending))
 		})
 
 		It("should create a Deployment", func() {
 			By("Creating a new OpBatcher")
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -270,7 +307,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					PrivateKey: optimismv1alpha1.SecretKeyRef{
 						SecretRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "batcher-private-key",
+								Name: secretName,
 							},
 							Key: "private-key",
 						},
@@ -286,14 +323,20 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that a Deployment was created")
 			deployment := &appsv1.Deployment{}
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, deployment)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, deployment)
 			}, timeout, interval).Should(Succeed())
 
 			Expect(deployment.Name).To(Equal(resourceName))
@@ -304,7 +347,7 @@ var _ = Describe("OpBatcher Controller", func() {
 
 		It("should create a Service", func() {
 			By("Creating a new OpBatcher")
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -319,7 +362,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					PrivateKey: optimismv1alpha1.SecretKeyRef{
 						SecretRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "batcher-private-key",
+								Name: secretName,
 							},
 							Key: "private-key",
 						},
@@ -335,14 +378,20 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that a Service was created")
 			service := &corev1.Service{}
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, service)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, service)
 			}, timeout, interval).Should(Succeed())
 
 			Expect(service.Name).To(Equal(resourceName))
@@ -352,7 +401,7 @@ var _ = Describe("OpBatcher Controller", func() {
 
 		It("should handle validation errors gracefully", func() {
 			By("Creating an OpBatcher with invalid configuration")
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -380,13 +429,19 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred()) // Should not error, but should set error conditions
 
 			By("Checking that OpBatcher has error condition")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, opbatcher)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, opbatcher)
 			}, timeout, interval).Should(Succeed())
 
 			Expect(opbatcher.Status.Phase).To(Equal(OpBatcherPhaseError))
@@ -402,7 +457,7 @@ var _ = Describe("OpBatcher Controller", func() {
 
 		It("should handle missing OptimismNetwork gracefully", func() {
 			By("Creating an OpBatcher with nonexistent network reference")
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -414,7 +469,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					PrivateKey: optimismv1alpha1.SecretKeyRef{
 						SecretRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "batcher-private-key",
+								Name: secretName,
 							},
 							Key: "private-key",
 						},
@@ -430,13 +485,19 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that OpBatcher has network error condition")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, opbatcher)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, opbatcher)
 			}, timeout, interval).Should(Succeed())
 
 			Expect(opbatcher.Status.Phase).To(Equal(OpBatcherPhaseError))
@@ -453,11 +514,12 @@ var _ = Describe("OpBatcher Controller", func() {
 		It("should wait for OptimismNetwork to be ready", func() {
 			By("Creating an OpBatcher with network that's not ready")
 			// Update network to not be ready
-			Expect(k8sClient.Get(ctx, networkNamespacedName, network)).To(Succeed())
+			network := &optimismv1alpha1.OptimismNetwork{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: networkName, Namespace: "default"}, network)).To(Succeed())
 			network.Status.Phase = "Pending"
 			Expect(k8sClient.Status().Update(ctx, network)).To(Succeed())
 
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -469,7 +531,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					PrivateKey: optimismv1alpha1.SecretKeyRef{
 						SecretRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "batcher-private-key",
+								Name: secretName,
 							},
 							Key: "private-key",
 						},
@@ -485,13 +547,19 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that OpBatcher is pending")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, opbatcher)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, opbatcher)
 			}, timeout, interval).Should(Succeed())
 
 			Expect(opbatcher.Status.Phase).To(Equal(OpBatcherPhasePending))
@@ -507,7 +575,7 @@ var _ = Describe("OpBatcher Controller", func() {
 
 		It("should handle finalizer correctly", func() {
 			By("Creating a new OpBatcher")
-			opbatcher = &optimismv1alpha1.OpBatcher{
+			opbatcher := &optimismv1alpha1.OpBatcher{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: "default",
@@ -519,7 +587,7 @@ var _ = Describe("OpBatcher Controller", func() {
 					PrivateKey: optimismv1alpha1.SecretKeyRef{
 						SecretRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "batcher-private-key",
+								Name: secretName,
 							},
 							Key: "private-key",
 						},
@@ -528,20 +596,36 @@ var _ = Describe("OpBatcher Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, opbatcher)).To(Succeed())
 
-			By("Reconciling the created resource")
+			By("Reconciling the created resource twice (finalizer, then logic)")
 			controllerReconciler := &OpBatcherReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
 
+			// First reconcile - adds finalizer
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Second reconcile - actual logic
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that finalizer was added")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, opbatcher)
+				return k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, opbatcher)
 			}, timeout, interval).Should(Succeed())
 
 			found := false
@@ -558,13 +642,19 @@ var _ = Describe("OpBatcher Controller", func() {
 
 			By("Reconciling deletion")
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking that resource was deleted")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, typeNamespacedName, opbatcher)
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name:      resourceName,
+					Namespace: "default",
+				}, opbatcher)
 				return apierrors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue())
 		})
