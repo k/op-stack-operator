@@ -216,17 +216,27 @@ func (r *OptimismNetworkReconciler) testL1Connectivity(ctx context.Context, netw
 		timeout = network.Spec.L1RpcTimeout
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	connectCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	client, err := ethclient.DialContext(ctx, network.Spec.L1RpcUrl)
+	client, err := ethclient.DialContext(connectCtx, network.Spec.L1RpcUrl)
 	if err != nil {
 		return fmt.Errorf("failed to connect to L1 RPC: %w", err)
 	}
-	defer client.Close()
+
+	// Ensure client is always closed, even on early returns
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
 
 	// Get chain ID to verify connection and configuration
-	chainID, err := client.ChainID(ctx)
+	// Use a shorter timeout for the actual RPC call
+	callCtx, callCancel := context.WithTimeout(ctx, timeout/2)
+	defer callCancel()
+
+	chainID, err := client.ChainID(callCtx)
 	if err != nil {
 		return fmt.Errorf("failed to get L1 chain ID: %w", err)
 	}

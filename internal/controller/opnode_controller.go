@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -212,9 +213,16 @@ func (r *OpNodeReconciler) validateConfiguration(opNode *optimismv1alpha1.OpNode
 			return fmt.Errorf("sequencer nodes should have P2P discovery disabled for security")
 		}
 
-		// Sequencers should not have L2RpcUrl set
+		// For sequencer nodes, L2RpcUrl should only be set when connecting to external networks
+		// If L2RpcUrl is set for a sequencer, it typically means they're part of a larger network
+		// and not the primary sequencer, so we allow it but validate it's a valid URL
 		if opNode.Spec.L2RpcUrl != "" {
-			return fmt.Errorf("sequencer nodes should not have L2RpcUrl set")
+			// Basic URL validation - ensure it starts with http/https
+			if len(opNode.Spec.L2RpcUrl) < 7 ||
+				(!strings.HasPrefix(opNode.Spec.L2RpcUrl, "http://") &&
+					!strings.HasPrefix(opNode.Spec.L2RpcUrl, "https://")) {
+				return fmt.Errorf("L2RpcUrl must be a valid HTTP/HTTPS URL")
+			}
 		}
 	}
 
@@ -482,9 +490,38 @@ func (r *OpNodeReconciler) updateStatusWithRetry(ctx context.Context, opNode *op
 
 		// Deep copy conditions to avoid reference issues
 		latest.Status.Conditions = make([]metav1.Condition, len(opNode.Status.Conditions))
-		copy(latest.Status.Conditions, opNode.Status.Conditions)
+		for i, condition := range opNode.Status.Conditions {
+			latest.Status.Conditions[i] = metav1.Condition{
+				Type:               condition.Type,
+				Status:             condition.Status,
+				Reason:             condition.Reason,
+				Message:            condition.Message,
+				LastTransitionTime: condition.LastTransitionTime,
+				ObservedGeneration: condition.ObservedGeneration,
+			}
+		}
 
-		latest.Status.NodeInfo = opNode.Status.NodeInfo
+		// Deep copy NodeInfo to avoid reference issues
+		if opNode.Status.NodeInfo != nil {
+			latest.Status.NodeInfo = &optimismv1alpha1.NodeInfo{
+				PeerCount:       opNode.Status.NodeInfo.PeerCount,
+				EngineConnected: opNode.Status.NodeInfo.EngineConnected,
+			}
+			if opNode.Status.NodeInfo.SyncStatus != nil {
+				latest.Status.NodeInfo.SyncStatus = &optimismv1alpha1.SyncStatusInfo{
+					CurrentBlock: opNode.Status.NodeInfo.SyncStatus.CurrentBlock,
+					HighestBlock: opNode.Status.NodeInfo.SyncStatus.HighestBlock,
+					Syncing:      opNode.Status.NodeInfo.SyncStatus.Syncing,
+				}
+			}
+			if opNode.Status.NodeInfo.ChainHead != nil {
+				latest.Status.NodeInfo.ChainHead = &optimismv1alpha1.ChainHeadInfo{
+					BlockNumber: opNode.Status.NodeInfo.ChainHead.BlockNumber,
+					BlockHash:   opNode.Status.NodeInfo.ChainHead.BlockHash,
+					Timestamp:   opNode.Status.NodeInfo.ChainHead.Timestamp,
+				}
+			}
+		}
 
 		return r.Status().Update(ctx, latest)
 	})
